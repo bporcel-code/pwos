@@ -1,0 +1,3486 @@
+/* PWOS -- Dashboard, rediseño "cascada macro→micro" (2026-08-19).
+   Tema oscuro fijo (terminal financiera) -- valores exactos definidos
+   y validados por el usuario en un prototipo de mockup antes de este
+   rediseño, no elegidos aca. Estructura en tokens por si algun dia
+   hace falta agregar un tema mas (ej. claro) sin reescribir todo: solo
+   haria falta un bloque nuevo tipo [data-theme="light"] con estos
+   mismos nombres de variable. */
+:root {
+  color-scheme: dark;
+  --bg:             #0b0f14;
+  --surface:        #131a22;
+  --border:         #263140;
+  --text-primary:   #e8edf2;
+  --text-secondary: #8b98a5;
+  --accent:         #f0a020;
+
+  --series-1: #f0a020; /* ambar */
+  --series-2: #2dd4a8; /* teal */
+  --series-3: #4f9dff; /* azul */
+  --series-4: #ff6b4a; /* coral */
+  --series-5: #c792ea; /* violeta */
+  --series-6: #6fcf97; /* verde */
+  --series-7: #e0c341; /* dorado */
+  --series-8: #ff8fab; /* rosa */
+
+  /* Colores de ESTADO (ganancia/perdida), no de la paleta categorica de
+     arriba -- nunca reutilizar --positivo/--negativo para distinguir
+     entidades (tickers, tipos, brokers), son solo para signo. */
+  --positivo: #4ade80;
+  --negativo: #f87171;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* CAMBIO 2026-08-21: se permite scroll de pagina -- con el panel de
+     rendimiento sumado (4to indicador), forzar TODO el dashboard a
+     entrar en un viewport fijo obligaba a comprimir los 3 paneles de
+     arriba hasta generar scroll interno feo (tabla de ganancia con
+     scroll horizontal Y vertical a la vez, columnas cortadas). Los 3
+     paneles de arriba vuelven a su alto comodo original; el de
+     rendimiento queda debajo, se llega bajando la pagina con scroll
+     normal. El scroll INTERNO acotado de cada tabla (`.eventos-wrap`,
+     altura maxima + header sticky) sigue vigente para listas largas --
+     lo que se elimina es forzar TODO el dashboard a un solo pantallazo.
+  */
+  overflow-x: hidden;
+}
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 16px 20px;
+  gap: 12px;
+}
+
+header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* Menu superior: separa Dashboard ("que tengo, de un vistazo") de
+   Analisis ("interactuar para decidir sobre un activo", Epica 11) --
+   pedido del usuario 2026-09-07. Sin router ni reload de pagina:
+   ambas vistas viven en el DOM, se togglea .hidden en #vista-dashboard/
+   #vista-analisis + el bloque de metricas del header (es contenido de
+   "que tengo", no chrome permanente) -- mismo criterio que el resto del
+   dashboard (sin build step, JS plano). */
+.menu-superior {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.menu-superior button {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 15px;
+  font-weight: 600;
+  padding: 10px 18px 9px;
+  cursor: pointer;
+  font-family: inherit;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.menu-superior button:hover {
+  color: var(--text-primary);
+}
+
+.menu-superior button.activo {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* Mobile angosto (2026-09-13, punto 2 del barrido de pendientes): con
+   4 solapas ("Dashboard"/"Indicadores Macro"/"Bonos"/"Acciones") en una
+   fila flex sin wrap, por debajo de ~480px "Acciones" quedaba cortado
+   fuera de la vista (confirmado con Playwright, ver ESTADO_PWOS.md) --
+   mismo patron de tab bar scrolleable que cualquier app mobile, en vez
+   de arriesgar que las solapas se corten a la mitad envolviendolas. */
+@media (max-width: 480px) {
+  .menu-superior {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .menu-superior button {
+    white-space: nowrap;
+    flex: 0 0 auto;
+  }
+
+  /* Que se note que hay mas solapas a la derecha (2026-10-30): una flecha
+     pegada al borde (sticky dentro del scroll) sobre un degradado; app.js
+     pone .hay-mas mientras quede algo sin ver. */
+  .menu-superior.hay-mas::after {
+    content: "›";
+    position: sticky;
+    right: 0;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    padding: 0 6px 0 28px;
+    margin-left: -34px;
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--accent);
+    background: linear-gradient(to right, transparent, var(--bg) 55%);
+    pointer-events: none;
+  }
+}
+
+/* #vista-dashboard/#vista-analisis reemplazan a .cascada/los paneles
+   standalone como hijos directos de .wrap -- sin esto pierden el gap de
+   12px que .wrap les daba como flex items hermanos (quedarian los
+   paneles pegados sin separacion dentro de cada vista). */
+#vista-dashboard,
+#vista-indicadores-macro,
+#vista-analisis-bonos,
+#vista-analisis-acciones,
+#vista-real-estate {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Especificidad: un selector de ID le gana a uno de 1 clase (.hidden)
+   pese al orden en el archivo -- se combina ID+clase para que .hidden
+   gane cuando se togglea (mismo bug que ya aparecio con
+   .rotacion-candidato vs .eventos-tabla td, Epica 11). */
+#vista-dashboard.hidden,
+#vista-indicadores-macro.hidden,
+#vista-analisis-bonos.hidden,
+#vista-analisis-acciones.hidden,
+#vista-real-estate.hidden {
+  display: none;
+}
+
+/* Recuadro del titulo -- mismo lenguaje visual que los paneles de abajo
+   (superficie + borde + radio), agrupa nombre del sistema + a quien
+   pertenece + las cotizaciones del dia, todo junto como pidio el usuario.
+
+   max-width (2026-08-30): causa real de que el header pasara a 2 filas
+   en anchos de laptop (1366/1280px) -- sin tope, esta caja crecia hasta
+   el ancho COMPLETO de su linea mas larga (el subtitulo, que paso a
+   tener MEP/CCL + 3 benchmarks nuevos en una sola linea sin cortar,
+   ~710px). Eso dejaba muy poco lugar para los 3 cuadros de metricas en
+   la misma fila, y el flex-wrap del <header> mandaba TODO .metricas a
+   una fila propia (los cuadros terminaban por debajo del titulo, no al
+   lado). Con un tope de ancho, el subtitulo se acomoda solo en 2-3
+   lineas (texto real del titulo mide ~352px sin wrap, este limite le
+   deja margen sin recortarlo) y el resto del header queda libre para
+   los cuadros de metricas, que ahora si quedan al lado. */
+.titulo-caja {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 420px;
+}
+
+.titulo-caja .titulo-principal {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  letter-spacing: 0.01em;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.titulo-caja .autor {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  margin: 0 0 2px;
+}
+
+.titulo-caja .subtitulo {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  margin: 0;
+}
+
+/* ADR-033: alguna cotizacion cayo al cierre por falla de la fuente. Ambar
+   (--accent), no rojo: es un aviso sobre el dato, no una perdida. */
+.titulo-caja .subtitulo.cotizaciones-aviso {
+  color: var(--accent);
+}
+
+/* Mobile angosto (2026-09-13, punto 2 del barrido de pendientes): la
+   causa REAL del corte reportado el 2026-08-29 no eran los cuadros de
+   .metricas (esos ya reflowan bien con el grid auto-fit agregado
+   despues, 2026-09-11) sino .titulo-principal -- `white-space: nowrap`
+   fuerza un ancho minimo de ~390px en .titulo-caja sin importar el
+   viewport (confirmado con Playwright: getBoundingClientRect da
+   390.4375px de ancho incluso a 320px de viewport), y como el body usa
+   `overflow-x: hidden` (2026-08-21) ese excedente queda invisible en
+   vez de generar scroll. Se permite wrap solo por debajo de 480px --
+   arriba de eso el nowrap sigue siendo la eleccion visual original. */
+@media (max-width: 480px) {
+  .titulo-caja {
+    max-width: 100%;
+  }
+
+  .titulo-caja .titulo-principal {
+    white-space: normal;
+    font-size: 18px;
+  }
+}
+
+/* Grid de columnas iguales (2026-08-30, 2do fix de asimetria): el
+   primer intento (flex:1 1 auto + justify-content:space-between) hacia
+   que el 1er cuadro pegara contra el borde izquierdo de .metricas y el
+   ultimo contra el derecho -- con .metricas ocupando todo el ancho
+   restante, eso dejaba huecos grandes entre cuadros en vez de un grupo
+   parejo. grid-template-columns le da a cada cuadro EL MISMO ancho de
+   columna (no el ancho de su propio contenido) y el texto centrado
+   adentro de esa columna. flex:1 1 auto se mantiene en el padre para
+   que .metricas siga ocupando el ancho que le queda junto al titulo (o
+   el 100% si le toca fila propia por el flex-wrap del header).
+
+   auto-fit minmax (2026-09-11, al sumar la 4ta tarjeta "Sensibilidad a
+   tasas"): un fijo repeat(4,1fr) angostaria las 4 columnas tambien en
+   anchos de laptop (1024px) sin ningun media query que las reacomode --
+   mismo patron ya usado en .macro-grid. Con auto-fit, en desktop entran
+   las 4 en una fila igual que antes entraban 3; en anchos mas angostos
+   se reparten en menos columnas en vez de cortarse. */
+header .metricas {
+  display: grid;
+  /* Patrimonio + 4 tarjetas (2026-10-30): columnas fijas, sin huerfanas. */
+  grid-template-columns: minmax(150px, 2fr) repeat(4, minmax(95px, 1fr));
+  grid-auto-rows: 1fr;
+  /* base: al lado del titulo solo si cada tarjeta tiene lugar; si no, fila propia */
+  flex: 1 1 960px;
+  gap: 8px;
+}
+
+/* Especificidad: "header .metricas" (clase+elemento) le gana a .hidden
+   sola -- se combina con el id para togglear el menu superior nuevo. */
+#metricas-header.hidden {
+  display: none;
+}
+
+/* Achicado + estilo de tarjeta (2026-09-12: "no es
+   necesario que el tamano del texto sea tan grande" -- mismo lenguaje
+   visual que .macro-item (tarjeta con borde + fondo sutil) en vez del
+   texto suelto centrado de antes, pero conservando el color de
+   ganancia/perdida (.positivo/.negativo) que .macro-item no necesita. */
+header .metrica-grupo {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+}
+
+header .metrica-label {
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  margin: 0 0 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+header .metrica-valor {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  white-space: nowrap;
+  font-variant-numeric: proportional-nums;
+  color: var(--accent);
+}
+
+header .metrica-valor.positivo {
+  color: var(--positivo);
+}
+
+header .metrica-valor.negativo {
+  color: var(--negativo);
+}
+
+/* Un solo detalle por tarjeta (2026-10-29): misma estructura en las 6.
+   Reserva 2 renglones en todas para que tengan el mismo alto aunque en
+   anchos de laptop el texto corte; mas de 2 se recorta con "..." y el
+   texto completo queda en el title (ver pintarMetrica en app.js). */
+header .metrica-detalle {
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--text-secondary);
+  margin: 3px 0 0;
+  min-height: 2.6em;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* Patrimonio total: la cifra protagonista del header, ocupa 2 columnas. */
+header .metrica-principal {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+header .metrica-principal .metrica-valor {
+  font-size: 30px;
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+
+/* Angosto: patrimonio arriba a todo el ancho y las 4 tarjetas en una fila;
+   en celular, en 2x2. */
+@media (max-width: 900px) {
+  header .metricas {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  header .metrica-principal {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  header .metricas {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  header .metrica-principal {
+    grid-column: 1 / -1;
+  }
+}
+
+.cascada {
+  /* CAMBIO 2026-08-21: vuelve a su alto comodo original (una sola fila),
+     el panel de rendimiento ya no vive adentro de esta grilla -- ver
+     `.panel-rendimiento-standalone` mas abajo. Alto fijo en vh (no
+     flex:1 1 auto): con `.wrap` en min-height:100vh en vez de height
+     fija, flex-grow ya no tiene un contenedor de tamaño definido del
+     que tomar "espacio libre" de forma confiable -- un alto explicito
+     es mas predecible. min-height en px para que no se aplaste en
+     ventanas bajas antes de caer al breakpoint mobile. */
+  flex: 0 0 auto;
+  height: 78vh;
+  min-height: 560px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .cascada {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: auto;
+  }
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .panel {
+    min-height: 420px;
+  }
+}
+
+.panel-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.panel-header h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+/* Botón de contraer/expandir panel (2026-09-16, pedido del usuario --
+   tablas grandes en Bonos que ocupaban mucho espacio). El estado se
+   persiste en localStorage por panel (ver app.js). */
+.panel-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 5px;
+  padding: 2px 8px;
+  font-size: 13.5px;
+  font-family: inherit;
+  line-height: 1.4;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.panel-toggle:hover {
+  color: var(--text-primary);
+  border-color: var(--text-primary);
+}
+
+/* Colapsado: oculta todo el contenido del panel salvo el header.
+   min-height:0 fuerza el shrink tambien en mobile (el .panel de la
+   media query de arriba fuerza 420px) -- gana por especificidad
+   (2 clases > 1) sin importar el orden en el archivo. */
+.panel.panel-colapsado {
+  min-height: 0;
+}
+.panel.panel-colapsado > :not(.panel-header) {
+  display: none;
+}
+
+/* ---- Selector de dimension (panel izquierdo) ---- */
+.dim-selector {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.dim-selector button {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.dim-selector button + button {
+  border-left: 1px solid var(--border);
+}
+
+.dim-selector button.activo {
+  background: var(--accent);
+  color: #1a1206;
+  font-weight: 600;
+}
+
+.hidden {
+  display: none;
+}
+
+/* ---- Panel de ganancia: filtro L1 (Todos/RF/RV) + L2 (subtipo,
+   contextual) + subtotal de la categoria activa. Mismo componente
+   visual .dim-selector que ya usa la torta -- el L2 es una segunda
+   fila mas chica, aparece solo cuando el L1 activo tiene subtipos. ---- */
+#panel-ganancia .dim-selector {
+  flex: 0 0 auto; /* sin esto, el panel las achica (flex-shrink por
+    default) para hacerle lugar a la tabla en vez de mantener su alto real */
+  margin-bottom: 8px;
+}
+
+.dim-selector-sub button {
+  font-size: 12.5px;
+  padding: 4px 9px;
+}
+
+.ganancia-subtotal {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ganancia-subtotal strong {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ganancia-subtotal .subtotal-positivo {
+  color: var(--positivo);
+}
+
+.ganancia-subtotal .subtotal-negativo {
+  color: var(--negativo);
+}
+
+/* ---- Dividendos cobrados (dentro de Ganancia/perdida, solo visible
+   filtrado en "Renta variable") y Renta cobrada (debajo de Flujo de
+   pagos) -- mismo look que ganancia-subtotal, un tono mas discreto
+   (son un complemento informativo, no el dato principal del panel). ---- */
+.dividendos-cobrados,
+.renta-cobrada {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text-secondary) 6%, transparent);
+}
+
+.dividendos-cobrados strong,
+.renta-cobrada strong {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.renta-cobrada {
+  margin-top: 10px;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* ---- Desglose "renta cobrada por broker" como mini barras horizontales
+   (2026-08-29, reemplaza la lista de texto plano) -- mismo criterio que
+   el resto del dashboard: SVG/CSS nativo, sin libreria de graficos. Cada
+   fila usa el mismo color de broker que ya define CLAVE_COLOR (app.js). ---- */
+.broker-bar-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.broker-bar-fila {
+  display: grid;
+  grid-template-columns: 100px 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.broker-bar-nombre {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.broker-bar-pista {
+  height: 7px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text-secondary) 14%, transparent);
+  overflow: hidden;
+}
+
+.broker-bar-relleno {
+  /* display:block: mismo bug que .rank-bar-relleno -- <span> dentro de
+     .broker-bar-pista (no grid item), sin esto width/height se ignoran. */
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+}
+
+.broker-bar-valor {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* .hidden se define mas arriba en el archivo -- misma especificidad que
+   .dividendos-cobrados/.renta-cobrada (una sola clase c/u), sin esta
+   regla combinada el orden del cascade lo pisa con display:flex. */
+.dividendos-cobrados.hidden {
+  display: none;
+}
+
+/* ---- Breadcrumb ---- */
+.breadcrumb {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.breadcrumb button {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 2px 3px;
+  border-radius: 4px;
+}
+
+.breadcrumb button:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.breadcrumb .crumb-actual {
+  color: var(--text-primary);
+  font-weight: 600;
+  padding: 2px 3px;
+}
+
+.breadcrumb .sep {
+  color: var(--border);
+}
+
+/* ---- Torta / dona con drill-down ---- */
+.donut-area {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.donut-svg {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+}
+
+.donut-slice {
+  cursor: pointer;
+  stroke: var(--surface);
+  stroke-width: 1.5;
+  transition: opacity 0.12s ease;
+}
+
+.donut-slice:hover {
+  opacity: 0.82;
+}
+
+.donut-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+  max-width: 62%;
+}
+
+.donut-center .donut-center-label {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  margin: 0 0 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.donut-center .donut-center-valor {
+  color: var(--text-primary);
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+  font-variant-numeric: proportional-nums;
+  line-height: 1.15;
+}
+
+/* ---- Leyenda del nivel actual -- puede tener mas filas que el alto
+   disponible (ej. 24 tickers en un broker) asi que scrollea sola, en
+   vez de romper el layout de altura fija del panel. ---- */
+.donut-legend {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 44%;
+  overflow-y: auto;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 16px;
+  scrollbar-width: thin; /* Firefox -- que el corte de una fila se note como
+    "hay mas, scrolleá" y no como texto truncado por error */
+  scrollbar-color: var(--border) transparent;
+}
+
+.donut-legend::-webkit-scrollbar {
+  width: 6px;
+}
+
+.donut-legend::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13.5px;
+  padding: 3px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+  min-width: 0;
+}
+
+.legend-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.legend-item .legend-nombre {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legend-item .legend-pct {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+
+.swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex: none;
+}
+
+/* ---- Panel de flujo de pagos ---- */
+.flujo-controles {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.riesgo-select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-family: inherit;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.flujo-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-family: inherit;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.flujo-toggle:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.flujo-chart {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 130px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  margin-bottom: 8px;
+}
+
+.flujo-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+  height: 100%;
+  /* CAMBIO 2026-08-21: flex-shrink volvia a 0 (nunca se achicaba) --
+     con los 12 meses por defecto, eso forzaba scroll horizontal en
+     cualquier ventana mas angosta que ~1450px (confirmado con
+     Playwright a 1366/1280px). Ahora se achica primero hasta el piso
+     de 18px antes de recurrir a `overflow-x: auto` del contenedor. */
+  flex: 1 1 0;
+  min-width: 18px;
+  cursor: pointer;
+}
+
+.flujo-col.seleccionada .flujo-bar {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.flujo-bar {
+  display: flex;
+  flex-direction: column-reverse;
+  width: 100%;
+  border-radius: 2px 2px 0 0;
+  overflow: hidden;
+}
+
+.flujo-seg {
+  width: 100%;
+}
+
+.flujo-seg.estimado {
+  opacity: 0.55;
+}
+
+/* 2026-10-05 (v2.45): la barra ocupa toda el area y cada segmento mide su
+   % del maximo; la amortizacion (capital que vuelve) va arriba y tenue,
+   para que la renta pura se lea sola contra la linea de objetivo. */
+.flujo-bar-area {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: flex-end;
+}
+
+.flujo-bar-area .flujo-bar {
+  height: 100%;
+  background: none;
+}
+
+.flujo-seg.amortizacion,
+.swatch.amortizacion {
+  opacity: 0.4;
+}
+
+.flujo-objetivo {
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  border-top: 1px dashed var(--text-primary);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.swatch-objetivo {
+  display: inline-block;
+  width: 14px;
+  border-top: 1px dashed var(--text-primary);
+}
+
+/* Tanda 3: meses ya pasados (estimado vs. real), un poco apagados. */
+.flujo-col.pasado .flujo-bar {
+  opacity: 0.75;
+}
+
+.flujo-col.pasado .flujo-col-label {
+  font-style: italic;
+}
+
+.flujo-col.cumple-objetivo .flujo-col-label {
+  color: var(--positivo);
+  font-weight: 600;
+}
+
+.flujo-resumen-mes {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  color: var(--text-secondary);
+}
+
+.flujo-resumen-mes strong {
+  color: var(--text-primary);
+}
+
+.flujo-estado {
+  font-size: 12.5px;
+}
+
+.flujo-sub {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.flujo-estado-cobrado { color: var(--positivo); }
+.flujo-estado-a_confirmar { color: var(--accent); font-weight: 600; }
+.flujo-estado-no_cobrado { color: var(--negativo); font-weight: 600; }
+.flujo-estado-estimado { color: var(--text-secondary); }
+
+.flujo-col-label {
+  margin-top: 4px;
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.flujo-leyenda {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.flujo-leyenda span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ---- Tabla de eventos: unico elemento con scroll interno propio,
+   encabezado pegado arriba (sticky). El resto del "shell" del
+   dashboard tiene altura fija -- solo esto crece/scrollea. ---- */
+.eventos-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.eventos-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.eventos-tabla thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  color: var(--text-secondary);
+  text-align: left;
+  font-weight: 600;
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  /* Reducido de 8px 12px (2026-08-21): con 5 columnas (panel de
+     ganancia) el padding original forzaba scroll horizontal en
+     ventanas de laptop tipicas (1366-1440px, confirmado con
+     Playwright) -- ver tambien el acortamiento de 2 headers largos en
+     index.html. */
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--border);
+  z-index: 1;
+}
+
+.eventos-tabla td {
+  padding: 6px 6px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.eventos-tabla td.eventos-monto {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.eventos-tabla tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.eventos-tabla tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.eventos-vacio {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+}
+
+.eventos-nota {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  margin: 6px 0 0;
+}
+
+/* ---- Panel de ganancia/perdida: reusa .eventos-* (misma tabla con
+   scroll interno + header sticky) -- solo la celda de porcentaje suma
+   color de estado. ---- */
+.ganancia-positivo {
+  color: var(--positivo);
+}
+
+.ganancia-negativo {
+  color: var(--negativo);
+}
+
+/* ---- Panel de rendimiento en el tiempo (Modified Dietz, 2026-08-21).
+   Panel STANDALONE, ya no vive adentro de `.cascada` (rediseño mismo
+   dia, ver comentario en `.cascada`): con 4 indicadores completos,
+   forzar todo a un viewport fijo comprimia los otros 3 a un punto feo
+   (scroll interno doble). Este panel queda debajo del `.cascada`
+   original y se llega con scroll normal de pagina -- alto acotado con
+   min/max (no un numero magico exacto): suficiente para el grafico +
+   un par de filas de tabla sin scroll interno, con techo para que una
+   tabla larga en el futuro (mas fechas ancla acumuladas) siga
+   scrolleando adentro en vez de estirar la pagina sin limite.
+   Grafico de linea SVG nativo arriba + tabla numerica abajo (mismo
+   .eventos-tabla que el resto). El subtitulo deja explicito desde que
+   fecha arranca la serie -- a proposito, para que no se confunda con
+   "todo el historial". ---- */
+.panel-rendimiento-standalone {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+@media (max-width: 900px) {
+  .panel-rendimiento-standalone {
+    min-height: 260px;
+    max-height: none;
+  }
+}
+
+/* Efectivo por contenedor: tabla chica de cruce manual (moneda nativa),
+   fuera de la cascada de 3 paneles -- alto segun contenido, sin forzar
+   scroll interno (son ~5 filas). ---- */
+.panel-efectivo-standalone {
+  flex: 0 0 auto;
+}
+
+/* Epica 11 -- Herramienta 1 (rotacion de bonos) y Herramienta 2 (paso 1,
+   calendario de flujo). Mismo patron standalone que efectivo/rendimiento.
+   "Candidato a rotar" / "mes flojo" son señales de "prestale atencion",
+   no perdida de plata -- usan --accent (ambar), no --negativo (rojo,
+   reservado para signo de ganancia/perdida, ver :root). */
+.panel-rotacion-standalone,
+.panel-breakeven-standalone,
+.panel-breakeven-infl-standalone,
+.panel-devaluacion-standalone,
+.panel-tesis-standalone,
+.panel-calendario-standalone {
+  flex: 0 0 auto;
+}
+
+/* Especificidad: ".eventos-tabla td" (clase+elemento) le gana a un
+   selector de 1 sola clase -- se combina con .eventos-tabla para que
+   el color ambar no quede pisado por el color base de la celda. */
+.eventos-tabla .rotacion-candidato {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.rotacion-candidatos-lista {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.rotacion-sin-calcular td {
+  color: var(--text-secondary);
+  font-size: 13.5px;
+}
+
+.eventos-tabla .calendario-flojo {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Detalle por mes de "Calendario de flujo mensual" (2026-09-17): fila
+   expandible con la fecha exacta de cada movimiento, mismo patron ▾/▸
+   que "Umbrales de monitoreo" de las tesis. */
+.calendario-btn-detalle {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 5px;
+  padding: 1px 6px;
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+  margin-right: 6px;
+}
+.calendario-btn-detalle:hover {
+  color: var(--text-primary);
+  border-color: var(--text-primary);
+}
+.calendario-detalle > td {
+  padding: 0 0 10px 0;
+  background: color-mix(in srgb, var(--text-secondary) 4%, transparent);
+}
+.calendario-detalle-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.calendario-detalle-tabla th {
+  text-align: left;
+  color: var(--text-secondary);
+  font-weight: 500;
+  padding: 4px 10px;
+}
+.calendario-detalle-tabla th:last-child,
+.calendario-detalle-tabla td.eventos-monto {
+  text-align: right;
+}
+.calendario-detalle-tabla td {
+  padding: 3px 10px;
+  color: var(--text-primary);
+}
+.calendario-detalle-info {
+  cursor: help;
+  color: var(--text-secondary);
+}
+
+/* Epica 11 -- Herramienta 3 (rebalanceo de Renta Variable). Inputs
+   editables dentro de .eventos-tabla -- mismo tema oscuro que el resto,
+   sin estilo de browser por default. */
+.panel-rebalanceo-standalone,
+.panel-correlacion-standalone {
+  flex: 0 0 auto;
+}
+
+.rebalanceo-ticker-btn {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline dotted;
+}
+
+.rebalanceo-input-pct {
+  width: 64px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  padding: 3px 6px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.rebalanceo-guardar {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.rebalanceo-guardar:hover {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.eventos-tabla .rebalanceo-vender { color: var(--negativo); font-weight: 600; }
+.eventos-tabla .rebalanceo-agregar { color: var(--positivo); font-weight: 600; }
+
+.rebalanceo-detalle td {
+  background: color-mix(in srgb, var(--text-secondary) 5%, transparent);
+  padding: 10px 12px;
+}
+
+.rebalanceo-detalle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px 16px;
+}
+
+.rebalanceo-detalle-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.rebalanceo-detalle-grid input,
+.rebalanceo-detalle-grid textarea {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  padding: 5px 7px;
+  font-size: 13.5px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+/* Epica 11 -- Analizador / simulador de bonos. Mismo patron standalone
+   + tema oscuro que el resto de la pestana. */
+.panel-simulador-standalone,
+.panel-mercado-bonos-standalone,
+.panel-comparador-standalone {
+  flex: 0 0 auto;
+}
+
+/* Comparador de bonos multi-bono (2026-09-11) -- cada fila reusa
+   .simulador-buscador para el layout flex (input + input + input +
+   quitar), solo se ajusta el ancho de cada input puntual. */
+.comparador-fila {
+  align-items: center;
+  margin-bottom: 8px;
+}
+.comparador-fila .comparador-ticker {
+  width: 130px;
+  text-transform: uppercase;
+}
+.comparador-fila .comparador-precio,
+.comparador-fila .comparador-tir {
+  width: 170px;
+  text-align: right;
+}
+.comparador-quitar-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 5px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14.5px;
+}
+.comparador-quitar-btn:hover {
+  color: var(--negativo);
+  border-color: var(--negativo);
+}
+
+.simulador-buscador,
+.mercado-bonos-filtros {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.simulador-buscador input,
+.mercado-bonos-filtros input,
+.mercado-bonos-filtros select,
+.simulador-inputs input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-primary);
+  padding: 6px 9px;
+  font-size: 14.5px;
+  font-family: inherit;
+}
+
+.simulador-buscador input { min-width: 240px; }
+.mercado-bonos-filtros input { min-width: 200px; flex: 1 1 200px; max-width: 340px; }
+
+/* Comparador de ratio (Epica 14 Parte 2, 2026-09-14) -- selects de
+   ticker mas anchos que el resto de .mercado-bonos-filtros porque cada
+   <option> lleva categoria + moneda_especie ademas del ticker. */
+.ratio-bonos-select-ticker { min-width: 220px; flex: 1 1 220px; max-width: 360px; }
+.ratio-bonos-vs {
+  align-self: center;
+  color: var(--text-secondary);
+  font-size: 14.5px;
+}
+.ratio-bonos-promedio {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  margin: 2px 0 0;
+}
+.ratio-bonos-chart-caja { margin-top: 4px; }
+.ratio-bonos-svg { height: 220px; }
+/* .macro-chart-svg fija display:block -- misma especificidad que
+   [hidden], mismo gotcha ya documentado en .macro-item-chart[hidden]. */
+.ratio-bonos-svg[hidden] { display: none; }
+
+.simulador-buscador button,
+.simulador-inputs button {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 5px;
+  padding: 6px 16px;
+  font-size: 14.5px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.simulador-buscador button:hover,
+.simulador-inputs button:hover {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.simulador-inputs button.simulador-btn-sec {
+  background: none;
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+.simulador-titulo-bono {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.simulador-titulo-bono .simulador-sub {
+  font-size: 13.5px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.simulador-badge {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.simulador-subseccion {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 16px 0 8px;
+}
+
+.simulador-metricas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px 14px;
+}
+
+.simulador-metrica {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.simulador-metrica .m-label {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.simulador-metrica .m-valor {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.simulador-inputs {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.simulador-inputs label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.simulador-inputs input { width: 140px; text-align: right; }
+
+.simulador-nota {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 6px 0 0;
+}
+
+#simulador-cronograma-chart {
+  margin-top: 4px;
+}
+
+/* --- Mercado de bonos: chips de categoria + tabla agrupada acotada --- */
+.mercado-bonos-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.mercado-chip {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-family: inherit;
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mercado-chip:hover { color: var(--text-primary); }
+
+.mercado-chip.activo {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1a1206;
+  font-weight: 600;
+}
+
+.mercado-chip-n {
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.mercado-chip.activo .mercado-chip-n { opacity: 0.85; }
+
+.mercado-bonos-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+}
+
+/* Panel de mercado acotado -- no debe comerse la pantalla (pedido del
+   usuario). La tabla scrollea adentro. */
+.mercado-bonos-wrap {
+  max-height: 460px;
+}
+
+.eventos-tabla .mercado-grupo-header td {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mercado-bono-fila { cursor: pointer; }
+
+.mercado-cat-celda {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+}
+
+.mercado-badge-cartera {
+  color: var(--accent);
+  font-size: 11.5px;
+}
+
+/* Breakeven de inflacion / Devaluacion implicita -- badge de "conviene
+   segun REM" junto al ticker (Epica 14 Parte 1, 2026-09-14). */
+.conviene-badge {
+  color: var(--positivo);
+  font-weight: 700;
+  margin-left: 4px;
+}
+
+/* Curva TIR / duration (scatter SVG nativo, sin libreria) */
+.mercado-curva-caja {
+  margin-bottom: 10px;
+}
+
+.mercado-curva-svg {
+  width: 100%;
+  height: 210px;
+  display: block;
+}
+
+.mercado-curva-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+  opacity: 0.5;
+}
+
+.mercado-curva-eje {
+  fill: var(--text-secondary);
+  font-size: 10.5px;
+}
+
+.mercado-curva-fit {
+  fill: none;
+  stroke: var(--text-secondary);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  opacity: 0.8;
+}
+
+.mercado-curva-punto {
+  cursor: pointer;
+}
+
+.mercado-curva-punto:hover {
+  stroke: var(--text-primary);
+  stroke-width: 2;
+}
+
+.mercado-curva-nota {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  margin: 2px 0 0;
+}
+
+.efectivo-tabla td:first-child,
+.efectivo-tabla th:first-child {
+  font-weight: 600;
+}
+
+.rendimiento-subtitulo {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  margin: 2px 0 0;
+}
+
+.rendimiento-svg {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+}
+
+/* Tramo mas largo que UMBRAL_DIAS_TRAMO_LARGO (app.js) -- no hay ancla
+   intermedia real en el medio (2026-08-27, ver ESTADO_PWOS.md: cartera
+   sostuvo un bono/LECAP sin precio historico casi sin cortes durante
+   ese periodo). Punteado + mas tenue para no leerse como el mismo dato
+   solido que el resto de la linea. */
+/* Hit-area invisible para el tooltip (<title>) del tramo largo -- mucho
+   mas ancha que la linea punteada visible, sin esto hay que acertarle
+   a 2px exactos para ver el motivo al pasar el mouse. */
+/* Tramo provisorio del mes en curso (2026-10-27): punteado corto y punto
+   hueco, para que no se lea como un cierre firme. */
+/* ===== Solapa Analisis - Bonos: reordenamiento + centrado + paneles nuevos
+   (2026-09-09). #vista-analisis-bonos es flex-column, asi
+   que el orden visual se maneja con `order` sin mover el HTML. ===== */
+/* .bonos-cat-row (el wrapper de "Tenencias"+"Sensibilidad", no
+   #panel-bonos-categorias) es el verdadero item flex de
+   #vista-analisis-bonos -- necesita su PROPIO order (mismo bug que
+   #panel-breakeven mas abajo: sin esto caia en el default 0, mismo
+   nivel que el panel macro -- encontrado 2026-09-11). Reordenado
+   2026-09-12 para venir justo despues del panel
+   macro, antes de "Bonos en tenencia". */
+.bonos-cat-row { order: 10; }
+/* Tenencias/Sensibilidad apiladas una debajo de la otra (2026-09-12,
+   pedido del usuario -- antes iban lado a lado en .bonos-cat-row). Orden
+   explicito en AMBOS hijos, no solo en categorias: antes solo
+   #panel-bonos-categorias tenia `order` y #panel-bonos-sensibilidad
+   quedaba en el default (0), lo que en la grilla vieja de 2 columnas
+   la hacia aparecer PRIMERO (0 < 10) pese a ir despues en el HTML --
+   mismo patron de bug de `order` que ya midio esta solapa varias veces.
+   Con el wrapper ahora en columna unica, este orden explicito asegura
+   Tenencias arriba, Sensibilidad abajo. */
+#panel-bonos-categorias { order: 1; }
+#panel-bonos-sensibilidad { order: 2; }
+#panel-rotacion { order: 20; }
+/* #panel-breakeven (2026-09-11): sin este `order`, el default (0) lo
+   hacia caer en el mismo nivel que el panel macro -- aparecia ANTES de
+   "Bonos en tenencia" pese a estar despues en el HTML (bug real,
+   reportado por el usuario). 21 lo deja justo despues de rotacion (20) y
+   antes de calendario (30). */
+#panel-breakeven { order: 21; }
+#panel-calendario { order: 30; }
+#panel-mercado-bonos { order: 40; }
+/* Breakeven de inflacion / devaluacion implicita: vivian pegados al
+   panel macro (order 1/2) desde que se crearon (2026-09-11) -- movidos
+   2026-09-12 a debajo de "Mercado de bonos" y arriba
+   del Analizador/simulador. */
+#panel-breakeven-inflacion { order: 41; }
+#panel-devaluacion-implicita { order: 42; }
+#panel-simulador-bono { order: 50; }
+#panel-comparador-bonos { order: 51; }
+/* #panel-ratio-bonos (Epica 14 Parte 2, 2026-09-14): sin `order`
+   explicito caia en el default (0) -- mismo bug de siempre en esta
+   solapa (ver comentarios de #panel-breakeven/#panel-bonos-categorias
+   mas arriba), aparecia pegado al panel macro en vez de donde lo pone
+   el HTML. Pedido del usuario (2026-09-15): justo debajo de "Comparador
+   de bonos" (51). */
+#panel-ratio-bonos { order: 52; }
+#panel-tesis-bonos { order: 60; }
+/* #panel-macro-bonos/#panel-macro-acciones (2026-09-09 a 2026-09-12)
+   se unificaron en un unico #panel-macro, en su propia solapa
+   "Indicadores Macro" (2026-09-13) -- ya no hay panel
+   macro duplicado en Bonos/Acciones, estas 2 reglas de `order` quedaron
+   sin efecto y se sacaron. */
+
+/* Todas las columnas de las tablas de la solapa Bonos, centradas (pedido
+   del usuario). Combina id+clase+elemento para ganarle a ".eventos-tabla
+   td.eventos-monto" (los <th> ya no traen text-align inline). */
+#vista-analisis-bonos .eventos-tabla th,
+#vista-analisis-bonos .eventos-tabla td,
+#vista-analisis-bonos .eventos-tabla td.eventos-monto {
+  text-align: center;
+}
+#vista-analisis-bonos .eventos-tabla .mercado-grupo-header td {
+  text-align: left;
+}
+/* Tablas anchas de la solapa Bonos (Mercado de bonos 11 cols, Bonos en
+   tenencia 12 cols) -> scroll horizontal dentro del panel. */
+#vista-analisis-bonos .eventos-wrap { overflow-x: auto; }
+#vista-analisis-bonos .mercado-cat-celda { font-size: 12.5px; }
+.mercado-emisor-celda {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Panel macro: grilla de tarjetitas. auto-FIT (no auto-fill): con 5
+   items en un panel ancho, auto-fill deja una columna vacia al final y
+   las tarjetas quedan corridas a la izquierda ("como si faltara una
+   tag", el usuario 2026-09-10). auto-fit colapsa los tracks vacios y se
+   reparten parejo. Achicadas (2026-09-11: "ocupan
+   mucho espacio arriba") -- minmax mas chico, padding/fuentes reducidos;
+   mismos datos, menos alto de panel. */
+/* Segunda pasada de achicado (2026-09-12) -- la
+   primera (2026-09-11) ya habia bajado esto una vez, sigue siendo el
+   panel mas "pesado" visualmente de la solapa segun el usuario. */
+/* Epica 21 (2026-09-29): 108px -> 150px -- cada tarjeta suma delta
+   3m/12m, percentil y anotacion; en 108px partian cada linea en dos. */
+.macro-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 6px;
+}
+/* Encabezado de seccion (Epica 15, 2026-09-15) -- vive DENTRO del
+   mismo .macro-grid (sin componente nuevo),
+   por eso necesita grid-column:1/-1 para ocupar la fila completa en
+   vez de convertirse en 1 celda mas del auto-fit. */
+.macro-seccion-titulo {
+  grid-column: 1 / -1;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 6px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.macro-seccion-titulo:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+.macro-item {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 7px;
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+}
+.macro-item-label {
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 0 0 2px;
+}
+.macro-item-valor {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.macro-item-detalle {
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  margin: 2px 0 0;
+  line-height: 1.25;
+}
+.macro-item-fecha {
+  font-size: 9.5px;
+  color: var(--text-secondary);
+  opacity: 0.75;
+  margin: 2px 0 0;
+}
+
+/* Graficos historicos por tile (Epica 13, 2026-09-14) -- colapsados
+   por default, togglean con .macro-item-toggle. La tile que se
+   despliega pasa a ocupar toda la fila del grid (mismo .macro-grid de
+   siempre, auto-fit) para que el grafico tenga ancho real, en vez de
+   quedar apretado en ~108px como el resto de las tiles compactas. */
+.macro-item-toggle {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.macro-item-toggle:hover {
+  color: var(--text-primary);
+}
+
+.macro-item-expandido {
+  grid-column: 1 / -1;
+}
+
+.macro-item-chart {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+}
+/* [hidden] vs. regla de clase con `display` -- misma especificidad,
+   mismo bug ya documentado varias veces en este archivo (tesis-cerrar-
+   form, tesis-umbrales); precedente aplicado directo aca. */
+.macro-item-chart[hidden] {
+  display: none;
+}
+
+.macro-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.macro-chart-rango {
+  font-size: 10.5px;
+  color: var(--text-secondary);
+}
+.macro-chart-rango-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 7px;
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.macro-chart-rango-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-primary);
+}
+
+.macro-chart-svg {
+  width: 100%;
+  height: 110px;
+  display: block;
+}
+.macro-chart-linea {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.macro-chart-area {
+  fill: var(--accent);
+  opacity: 0.08;
+  stroke: none;
+}
+.macro-chart-punto {
+  fill: var(--bg);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+.macro-chart-eje-label {
+  fill: var(--text-secondary);
+  font-size: 9.5px;
+}
+/* Linea de promedio opcional (`opciones.promedio`, renderMiniLineChart)
+   -- solo la activa el comparador de ratio de bonos hoy (2026-09-14). */
+.macro-chart-promedio {
+  stroke: var(--text-secondary);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.macro-chart-promedio-label {
+  fill: var(--text-secondary);
+  font-size: 9.5px;
+  font-style: italic;
+}
+
+/* Tarjeta de indicador (Epica 21, 2026-09-29): deltas, percentil,
+   anotacion del usuario (umbral/objetivo/nota) y lapiz para editarla.
+   Umbral cruzado = mismo ambar (--accent) que .umbral-fila.umbral-cruzado
+   de las tesis (Epica 12): senal de atencion, no una perdida. */
+.macro-item-cabecera {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+}
+.macro-item-editar {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.macro-item-editar:hover {
+  color: var(--text-primary);
+  opacity: 1;
+}
+.macro-item-cruzado {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  /* Intensidad, no solo tono (2026-10-02): el contorno interior duplica el
+     grosor del borde sin mover la grilla, asi la alerta se distingue tambien
+     en escala de grises. Mismo ambar para nivel y velocidad (no rojo/verde,
+     reservados al semaforo); el icono del badge dice cual cruzo. */
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.macro-item-umbral-d3m,
+.macro-anotacion-unidad {
+  color: var(--text-secondary);
+}
+.macro-item-valor .tesis-card-alerta {
+  font-size: 9.5px;
+  padding: 1px 5px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.macro-item-deltas,
+.macro-item-pctil,
+.macro-item-anotacion,
+.macro-item-nota {
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  margin: 2px 0 0;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+.macro-item-pctil strong {
+  color: var(--text-primary);
+}
+.macro-item-anotacion {
+  color: var(--accent);
+}
+.macro-item-nota {
+  font-style: italic;
+}
+
+.macro-anotacion-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.macro-anotacion-campo {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.macro-anotacion-form select,
+.macro-anotacion-form input,
+.macro-anotacion-form textarea {
+  background: var(--bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 6px;
+  font-size: 12.5px;
+  font-family: inherit;
+}
+.macro-anotacion-form input[type="number"] {
+  width: 110px;
+}
+.macro-anotacion-form textarea {
+  flex: 1 1 100%;
+  resize: vertical;
+}
+.macro-anotacion-botones {
+  display: flex;
+  gap: 6px;
+}
+.macro-anotacion-cancelar {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 9px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.macro-anotacion-error {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--negativo);
+}
+/* [hidden] vs. regla de clase con `display`: mismo gotcha documentado
+   en .macro-item-chart[hidden]. */
+.macro-anotacion-error[hidden] {
+  display: none;
+}
+
+/* Panel "Maquina economica" (Epica 21, Tanda 4). Colores: rojo =
+   --negativo, amarillo = --accent (mismo ambar que los umbrales), verde =
+   --positivo, gris = sin umbral cargado. */
+.maquina-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+.maquina-card {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--text-secondary);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+}
+.maquina-card.maquina-rojo { border-left-color: var(--negativo); }
+.maquina-card.maquina-amarillo { border-left-color: var(--accent); }
+.maquina-card.maquina-verde { border-left-color: var(--positivo); }
+.maquina-titulo {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.maquina-miembros,
+.maquina-historial {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.maquina-valor {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  margin-left: 4px;
+}
+.maquina-fase {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+}
+.maquina-fase-vacia {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+.maquina-historial li {
+  border-top: 1px dashed var(--border);
+  padding-top: 3px;
+}
+.maquina-fase-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+.maquina-fase-form input,
+.maquina-fase-form textarea {
+  background: var(--bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 6px;
+  font-size: 12.5px;
+  font-family: inherit;
+}
+.maquina-tesis {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.maquina-tesis a {
+  color: var(--accent);
+}
+.punto-color {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: middle;
+  background: var(--text-secondary);
+  opacity: 0.45;
+}
+.punto-color.punto-grande { width: 10px; height: 10px; }
+.punto-rojo { background: var(--negativo); opacity: 1; }
+.punto-amarillo { background: var(--accent); opacity: 1; }
+.punto-verde { background: var(--positivo); opacity: 1; }
+
+/* Lineas de umbral y objetivo en el grafico de la tarjeta. */
+.macro-chart-umbral {
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 5 3;
+}
+.macro-chart-objetivo {
+  stroke: var(--positivo);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+.macro-chart-mediana {
+  stroke: var(--text-secondary);
+  stroke-width: 1;
+  stroke-dasharray: 1 3;
+}
+.macro-chart-ref-label {
+  fill: var(--text-secondary);
+  font-size: 9.5px;
+}
+
+/* "Tenencias por categoria" y "Sensibilidad a tasas por categoria"
+   (2026-09-11 las puso lado a lado; 2026-09-12: una
+   debajo de la otra; 2026-09-15: de vuelta lado a
+   lado). #vista-analisis-bonos es flex-column (ver mas arriba) -- este
+   wrapper ocupa 1 slot de esa columna y adentro reparte sus 2 hijos en
+   fila (orden explicito, ver mas abajo -- categorias primero/izquierda,
+   sensibilidad segundo/derecha). `flex-wrap` para que caigan apiladas
+   en mobile en vez de aplastarse. */
+.bonos-cat-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.bonos-cat-row > .panel {
+  flex: 1 1 320px;
+  min-width: 0; /* deja shrinkear el svg/tabla de adentro en vez de forzar overflow del row */
+}
+
+/* Barras rankeadas (tenencias de bonos por categoria) -- reusa el patron
+   visual de .broker-bar-* con la columna de etiqueta mas ancha. */
+.rank-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rank-bar-fila {
+  display: grid;
+  /* Columna de valor a ancho FIJO (no "auto"): cada fila arma su propio
+     grid (una `.rank-bar-fila` por bono/categoria, no un grid unico
+     compartido por `.rank-bars`) -- con "auto" cada fila reservaba solo
+     lo que su PROPIO texto necesitaba, asi que la pista de la barra
+     (1fr) quedaba mas angosta en "Tenencias por categoria" (montos
+     completos, ej. "$4.691,65") que en "Sensibilidad a tasas" (BPV en
+     centavos, ej. "-$0,92") -- 2 graficos lado a lado con barras a
+     escala visual distinta pese a compartir el mismo maximo relativo
+     (encontrado 2026-09-16, el usuario). 130px cubre el caso mas ancho
+     (porcentaje + monto con miles) sin achicar la pista.
+  */
+  grid-template-columns: 170px 1fr 130px;
+  align-items: center;
+  gap: 12px;
+  font-size: 13.5px;
+  /* min-height (2026-09-16, mismo hallazgo del usuario): "Sensibilidad"
+     tiene una 2da linea de texto (Carry, .rank-bar-sub) que "Tenencias"
+     no tiene -- sin esto cada fila mide 16px en un panel y 30px en el
+     otro, y el bloque completo de barras (8 categorias en ambos) queda
+     visiblemente mas bajo/chico en "Tenencias" aunque el ancho de barra
+     ya este igualado. 30px = alto real medido de una fila de 2 lineas. */
+  min-height: 30px;
+}
+.rank-bar-nombre {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+.rank-bar-pista {
+  height: 16px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text-secondary) 10%, transparent);
+  overflow: hidden;
+}
+.rank-bar-relleno {
+  /* display:block -- es un <span> dentro de .rank-bar-pista (que NO es
+     grid item, asi que no se "blockifica" solo); sin esto width/height
+     se ignoran y la barra renderiza en 0x0 (bug 2026-09-10). */
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  min-width: 3px;
+}
+.rank-bar-valor {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.rank-bar-valor strong { color: var(--text-primary); }
+
+/* Linea secundaria dentro de .rank-bar-valor (Carry bajo el BPV de cada
+   categoria, 2026-09-11) -- mismo patron que .metrica-sub-linea del
+   header: display:block fuerza el salto de linea dentro del span
+   padre sin romper el grid de .rank-bar-fila (la fila crece de alto
+   sola, .rank-bar-fila no tiene una altura fija). */
+.rank-bar-sub {
+  display: block;
+  font-size: 11.5px;
+  opacity: 0.75;
+}
+
+footer {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  text-align: center;
+  opacity: 0.7;
+}
+
+.error-banner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  color: var(--text-secondary);
+  font-size: 15px;
+}
+
+/* ===== Tesis de inversion (bitacora de bonos, 2026-09-12) ===== */
+
+.tesis-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+}
+
+.tesis-form-tipo {
+  display: flex;
+  gap: 18px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+}
+
+.tesis-form-tipo label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.tesis-form-fila {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+/* Mismo bug que .tesis-cerrar-form: sin este selector, el wrap del
+   ticker (`#tesis-form-ticker-wrap`, que combina esta clase con el
+   atributo `hidden` toggleado por JS) queda visible aunque este
+   "macro" seleccionado. */
+.tesis-form-fila[hidden] {
+  display: none;
+}
+
+.tesis-form-fila label,
+.tesis-form-fila-full {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.tesis-form-fila-full {
+  width: 100%;
+}
+
+.tesis-form input[type="text"],
+.tesis-form input[type="date"],
+.tesis-form select,
+.tesis-form textarea {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-primary);
+  padding: 6px 9px;
+  font-size: 14.5px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.tesis-form-acciones {
+  display: flex;
+  gap: 10px;
+}
+
+.tesis-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tesis-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+}
+
+.tesis-card.tesis-cerrada {
+  opacity: 0.72;
+}
+
+.tesis-card-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+}
+
+.tesis-card-badge {
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+.tesis-card-badge.tesis-badge-macro {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.tesis-card-fecha {
+  color: var(--text-secondary);
+}
+
+.tesis-card-conviccion {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+
+.tesis-card-conviccion.conviccion-alta { color: var(--positivo); border-color: var(--positivo); }
+.tesis-card-conviccion.conviccion-media { color: var(--text-secondary); }
+.tesis-card-conviccion.conviccion-baja { color: var(--negativo); border-color: var(--negativo); }
+
+.tesis-card-estado {
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 11.5px;
+}
+
+.tesis-card-estado.estado-cerrada {
+  background: color-mix(in srgb, var(--text-secondary) 15%, transparent);
+}
+
+.tesis-card-acciones {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+
+.tesis-card-acciones button {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 5px;
+  padding: 3px 9px;
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.tesis-card-acciones button:hover {
+  color: var(--text-primary);
+  border-color: var(--text-primary);
+}
+
+.tesis-card-texto {
+  color: var(--text-primary);
+  font-size: 14.5px;
+  line-height: 1.5;
+  margin: 0 0 6px;
+  white-space: pre-wrap;
+}
+
+.tesis-card-riesgos {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0 0 6px;
+  white-space: pre-wrap;
+}
+
+.tesis-card-reflexion {
+  font-size: 13.5px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  border-top: 1px dashed var(--border);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.tesis-cerrar-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+
+/* [hidden] y una regla de clase con `display` tienen la MISMA
+   especificidad -- sin este selector mas especifico, .tesis-cerrar-form
+   queda siempre visible pese al atributo hidden (bug real, encontrado
+   con Playwright: el formulario de cierre aparecia abierto en TODAS las
+   tarjetas, no solo la clickeada). Mismo patron que .rank-bar-relleno
+   (otro bug de CSS ya documentado mas arriba). */
+.tesis-cerrar-form[hidden] {
+  display: none;
+}
+
+.tesis-cerrar-form textarea {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-primary);
+  padding: 6px 9px;
+  font-size: 13.5px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+/* Umbrales de monitoreo (Epica 12 Parte 1, 2026-09-12) -- mismo
+   lenguaje visual que .tesis-cerrar-form (separador punteado arriba,
+   fondo/borde de .macro-item para cada fila). */
+.tesis-btn-umbrales {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 5px;
+  padding: 3px 9px;
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+  margin-top: 8px;
+}
+.tesis-btn-umbrales:hover {
+  color: var(--text-primary);
+  border-color: var(--text-primary);
+}
+
+.tesis-umbrales {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+/* [hidden] vs. regla de clase con `display`: misma especificidad --
+   mismo bug ya documentado en .tesis-cerrar-form, precedente aplicado
+   directo aca para no repetirlo. */
+.tesis-umbrales[hidden] {
+  display: none;
+}
+
+.tesis-umbrales-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.umbral-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 4px 8px;
+}
+/* Umbral cruzado (Epica 12 Parte 2, 2026-09-13) -- mismo criterio de
+   color que "candidato a rotar"/"mes flojo" (--accent, ambar): es una
+   señal de "prestale atencion", no una perdida confirmada, por eso no
+   usa --negativo (reservado para signo de ganancia/perdida real). */
+.umbral-fila.umbral-cruzado {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.tesis-card-alerta {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.umbral-texto strong {
+  color: var(--text-primary);
+}
+.umbral-btn-eliminar {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 2px;
+  flex: 0 0 auto;
+}
+.umbral-btn-eliminar:hover {
+  color: var(--negativo);
+}
+
+.tesis-umbral-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.tesis-umbral-form select,
+.tesis-umbral-form input[type="number"],
+.tesis-umbral-form input[type="text"] {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-primary);
+  padding: 5px 7px;
+  font-size: 13.5px;
+  font-family: inherit;
+}
+.tesis-umbral-form input[type="text"] {
+  flex: 1 1 180px;
+}
+.tesis-umbral-form input[type="number"] {
+  width: 90px;
+}
+
+/* ---- Solapa "Analisis - Acciones", rediseño (2026-09-21, Fase 1) ----
+   KPIs + tenencias + cubetas + concentracion. Colores por ENTIDAD fijos
+   (cada cubeta tiene el suyo, nunca por posicion en un ranking);
+   --accent (ambar) se usa solo para "supera un tope". Barras en HTML/CSS
+   puro, sin librerias de graficos. */
+.acc-encabezado {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.acc-titulo {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+.acc-fuente {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+}
+
+.acc-kpis {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+.acc-kpi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+.acc-kpi-label {
+  margin: 0 0 4px;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+}
+.acc-kpi-valor {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.acc-kpi-sub {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.acc-principal {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.acc-col-izq {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.acc-col-der {
+  flex: 0 0 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+/* 2 clases > .panel a 900px (min-height:420px): estos paneles se ajustan
+   a su contenido. */
+.panel.acc-panel {
+  min-height: 0;
+}
+@media (max-width: 1100px) {
+  .acc-principal { flex-direction: column; align-items: stretch; }
+  .acc-col-izq { flex: 0 0 auto; }
+  .acc-col-der { flex: 0 0 auto; }
+  .acc-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  .acc-kpis { grid-template-columns: 1fr; }
+}
+
+.acc-tenue { color: var(--text-secondary); }
+.acc-ambar-txt { color: var(--accent); }
+
+.acc-tenencias-wrap { max-height: 640px; }
+.acc-tenencias-pie {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.acc-chip {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.acc-chip-tipo {
+  margin-left: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.acc-chip-sin { font-weight: 500; }
+.acc-chip-valor_puro,
+.acc-c-valor_puro { --c: var(--series-2); }
+.acc-chip-calidad,
+.acc-c-calidad { --c: var(--series-3); }
+.acc-chip-mayor_riesgo,
+.acc-c-mayor_riesgo { --c: var(--series-4); }
+.acc-chip-valor_puro,
+.acc-chip-calidad,
+.acc-chip-mayor_riesgo {
+  color: var(--c);
+  border-color: color-mix(in srgb, var(--c) 50%, transparent);
+  background: color-mix(in srgb, var(--c) 12%, transparent);
+}
+
+.acc-pct-num {
+  display: inline-block;
+  min-width: 52px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.acc-barra {
+  position: relative;
+  display: inline-block;
+  width: 72px;
+  height: 8px;
+  margin-left: 8px;
+  background: var(--bg);
+  border-radius: 4px;
+  vertical-align: middle;
+}
+.acc-barra.acc-barra-ancha {
+  flex: 1 1 auto;
+  width: auto;
+  margin-left: 0;
+  height: 10px;
+}
+.acc-barra-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--text-secondary) 75%, transparent);
+  border-radius: 4px;
+}
+.acc-barra-fill.acc-ambar,
+.acc-cubeta-fill.acc-ambar { background: var(--accent); }
+.acc-barra-tope {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--text-primary);
+  opacity: 0.85;
+}
+.acc-tope-txt {
+  margin-left: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.acc-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: baseline;
+}
+.acc-dot-gris { background: #5b6b7c; }
+
+.acc-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 6px 4px;
+  white-space: normal;
+}
+.acc-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.acc-editor select,
+.acc-editor input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  padding: 4px 6px;
+  font-family: inherit;
+  font-size: 13.5px;
+}
+.acc-editor input { width: 90px; }
+
+.acc-cubeta { margin-bottom: 14px; }
+.acc-cubeta:last-child { margin-bottom: 4px; }
+.acc-cubeta-cab {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+  font-size: 13.5px;
+}
+.acc-cubeta-nombre { font-weight: 600; color: var(--c); }
+.acc-cubeta-track {
+  position: relative;
+  height: 16px;
+  background: var(--bg);
+  border-radius: 4px;
+}
+.acc-cubeta-banda {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--c) 22%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--c) 60%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--c) 60%, transparent);
+}
+.acc-cubeta-fill {
+  position: absolute;
+  left: 0;
+  top: 5px;
+  height: 6px;
+  background: var(--c);
+  border-radius: 3px;
+}
+.acc-cubeta-marca {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--text-primary);
+}
+.acc-cubeta-actual {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.acc-conc-titulo {
+  margin-bottom: 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.acc-conc-titulo-sep { margin-top: 14px; }
+.acc-conc-fila {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13.5px;
+}
+.acc-conc-nombre {
+  flex: 0 0 56px;
+  font-weight: 600;
+}
+.acc-conc-nombre.acc-conc-sector {
+  flex-basis: 120px;
+  font-weight: 500;
+}
+.acc-conc-val {
+  flex: 0 0 64px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Fase 2 (2026-09-21): semaforo, alertas y Ficha de posicion ----
+   Colores de ESTADO (verde/amarillo/rojo del semaforo): no se usan para
+   distinguir entidades. Amarillo propio (no --accent) para no confundirlo
+   con el ambar de "supera un tope". */
+:root { --sem-amarillo: #facc15; }
+
+.acc-dot-verde { background: var(--positivo); }
+.acc-dot-amarillo { background: var(--sem-amarillo); }
+.acc-dot-rojo { background: var(--negativo); }
+
+.acc-est {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.acc-est-verde { color: var(--positivo); border-color: color-mix(in srgb, var(--positivo) 50%, transparent); background: color-mix(in srgb, var(--positivo) 12%, transparent); }
+.acc-est-amarillo { color: var(--sem-amarillo); border-color: color-mix(in srgb, var(--sem-amarillo) 50%, transparent); background: color-mix(in srgb, var(--sem-amarillo) 12%, transparent); }
+.acc-est-rojo { color: var(--negativo); border-color: color-mix(in srgb, var(--negativo) 50%, transparent); background: color-mix(in srgb, var(--negativo) 12%, transparent); }
+.acc-est-sin { color: var(--text-secondary); font-weight: 500; }
+
+/* Filas de posicion clicables; la seleccionada se resalta con fondo, sin bordes laterales. */
+#tenencias-body tr[data-ticker] { cursor: pointer; }
+#tenencias-body tr.acc-fila-sel td { background: rgba(255, 255, 255, 0.07); }
+
+.acc-alertas-lista {
+  max-height: 420px;
+  overflow-y: auto;
+}
+.acc-alerta {
+  padding: 7px 0 7px 10px;
+  border-left: 3px solid var(--text-secondary);
+  margin-bottom: 8px;
+}
+.acc-alerta-alta { border-left-color: var(--negativo); }
+.acc-alerta-media { border-left-color: var(--accent); }
+.acc-alerta-atenuada { opacity: 0.6; border-left-color: var(--border); }
+.acc-alerta-titulo {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.acc-alerta-titulo:hover { text-decoration: underline; }
+.acc-alerta-etiqueta {
+  margin-left: 6px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 6px;
+}
+.acc-alerta-detalle {
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.acc-alerta-vacia {
+  margin-bottom: 8px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--positivo);
+}
+
+/* ---- Ficha de posicion ---- */
+#ficha-rv.hidden { display: none; }
+.acc-ficha-cab-fila {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.acc-ficha-ticker {
+  font-size: 24px;
+  font-weight: 700;
+}
+.acc-ficha-datos {
+  margin-top: 6px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+}
+.acc-ficha-datos strong { color: var(--text-primary); }
+.acc-ficha-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 14px;
+  margin-top: 14px;
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .acc-ficha-cols { grid-template-columns: minmax(0, 1fr); }
+}
+.acc-ficha-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.acc-ficha-bloque {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+.acc-ficha-bloque:empty { display: none; }
+.acc-ficha-titulo {
+  margin: 0 0 10px;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.acc-ficha-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 9px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.acc-ficha-campo textarea,
+.acc-ficha-campo input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  padding: 5px 7px;
+  font-family: inherit;
+  font-size: 13.5px;
+  resize: vertical;
+}
+.acc-ficha-grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 12px;
+}
+.acc-ficha-acciones {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+.acc-ficha-estado { font-size: 12.5px; color: var(--positivo); }
+.acc-ficha-estado-error,
+.acc-ficha-error { color: var(--negativo); font-size: 12.5px; }
+.acc-ficha-error:not(:empty) { margin-bottom: 8px; }
+.acc-ficha-reglas {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.acc-ficha-reglas li { margin-bottom: 6px; }
+
+.acc-tabla-scroll { overflow-x: auto; }
+.acc-ind-tabla td, .acc-ind-tabla th { white-space: nowrap; }
+.acc-ind-archivado td { opacity: 0.55; }
+.acc-ind-acciones { white-space: nowrap; }
+.acc-mini-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  padding: 1px 7px;
+  margin-right: 3px;
+  font-size: 11.5px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.acc-mini-btn:hover { color: var(--text-primary); border-color: var(--text-primary); }
+.acc-ind-detalle > td { background: rgba(255, 255, 255, 0.02); white-space: normal; }
+.acc-ind-hist-tabla { font-size: 12.5px; margin-bottom: 8px; border-collapse: collapse; }
+.acc-ind-hist-tabla th, .acc-ind-hist-tabla td { padding: 2px 12px 2px 0; text-align: left; color: var(--text-secondary); }
+.acc-ind-nuevo { margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 8px; }
+.acc-ind-agregar { margin-top: 10px; }
+
+/* Los botones de fila de la tabla de indicadores tienen que poder bajar de
+   linea: la columna izquierda de la ficha es angosta y con nowrap quedaban
+   cortados (Archivar/Borrar fuera de vista). 3 selectores (tabla+td+clase)
+   para ganarle a `.acc-ind-tabla td { white-space: nowrap }`. */
+.acc-ind-tabla td.acc-ind-acciones {
+  white-space: normal;
+  min-width: 132px;
+}
+.acc-ind-acciones .acc-mini-btn { margin-bottom: 3px; }
+
+/* ---- Fase 3 (2026-09-21): estado de valor, compuertas del screener, valuacion Graham ----
+   Colores de ESTADO (no distinguen entidades). "Sobrevalorada" usa --negativo pero es un
+   dato de valuacion, nunca una orden. */
+.acc-vs {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.acc-vs-infravalorada { color: var(--positivo); border-color: color-mix(in srgb, var(--positivo) 50%, transparent); background: color-mix(in srgb, var(--positivo) 12%, transparent); }
+.acc-vs-valor_justo { color: var(--text-primary); }
+.acc-vs-sobrevalorada { color: var(--negativo); border-color: color-mix(in srgb, var(--negativo) 45%, transparent); background: color-mix(in srgb, var(--negativo) 10%, transparent); }
+.acc-vs-sin_verificar, .acc-vs-no_aplica { font-weight: 500; }
+
+.acc-gate {
+  display: inline-block;
+  min-width: 22px;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: help;
+}
+.acc-gate-pasa { color: var(--positivo); border-color: color-mix(in srgb, var(--positivo) 50%, transparent); background: color-mix(in srgb, var(--positivo) 12%, transparent); }
+.acc-gate-no_pasa { color: var(--negativo); border-color: color-mix(in srgb, var(--negativo) 50%, transparent); background: color-mix(in srgb, var(--negativo) 12%, transparent); }
+.acc-gate-sin_verificar { color: var(--sem-amarillo); border-color: color-mix(in srgb, var(--sem-amarillo) 40%, transparent); }
+.acc-gate-no_aplica { opacity: 0.6; }
+.acc-gate-texto { font-size: 11.5px; padding: 1px 8px; cursor: default; }
+
+.acc-screener-cols {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.acc-screener-izq { flex: 1 1 0; min-width: 0; }
+.acc-screener-der { flex: 0 0 330px; min-width: 0; }
+@media (max-width: 1100px) {
+  .acc-screener-cols { flex-direction: column; align-items: stretch; }
+  .acc-screener-der { flex: 0 0 auto; }
+}
+.acc-screener-sep { margin-top: 16px; }
+.acc-screener-form { padding: 0; }
+.acc-screener-form input[type="text"] { width: 140px; text-transform: uppercase; }
+#screener-body tr[data-ticker] { cursor: pointer; }
+#screener-body tr.acc-fila-sel td { background: rgba(255, 255, 255, 0.07); }
+.acc-top5 { margin: 0 0 6px; padding-left: 20px; font-size: 13.5px; }
+.acc-top5 li { margin-bottom: 6px; cursor: pointer; }
+.acc-top5 li:hover strong { text-decoration: underline; }
+.acc-top5-margen { margin-left: 6px; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+
+.acc-val-veredictos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-bottom: 8px;
+  font-size: 13.5px;
+}
+.acc-val-tabla td, .acc-val-tabla th { white-space: nowrap; }
+.acc-crit { display: inline-flex; align-items: center; gap: 6px; }
+.acc-crit-umbral { color: var(--text-secondary); font-size: 12.5px; }
+.acc-nota-aviso { color: var(--sem-amarillo); }
+.acc-val-estado { margin: 4px 0 8px; font-size: 13.5px; }
+.acc-val-lista { margin: 8px 0; padding-left: 0; list-style: none; font-size: 13.5px; line-height: 1.6; }
+.acc-val-estados { margin-top: 8px; }
+.acc-val-estados li { font-size: 12.5px; color: var(--text-secondary); opacity: 0.7; }
+.acc-val-estados li.acc-val-actual { opacity: 1; color: var(--text-primary); }
+
+/* Barra de margen de seguridad: rango manual sombreado + marcas de VI, maximo de compra y precio. */
+.acc-vi-barra {
+  position: relative;
+  height: 22px;
+  margin: 10px 0 6px;
+  background: var(--bg);
+  border-radius: 4px;
+}
+.acc-vi-rango {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--series-3) 25%, transparent);
+  border-left: 1px solid var(--series-3);
+  border-right: 1px solid var(--series-3);
+}
+.acc-vi-marca { position: absolute; top: -3px; bottom: -3px; width: 3px; border-radius: 2px; transform: translateX(-1px); }
+.acc-vi-vi { background: var(--series-3); }
+.acc-vi-max { background: var(--positivo); }
+.acc-vi-precio { background: var(--text-primary); width: 4px; }
+.acc-vi-leyenda { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11.5px; color: var(--text-secondary); margin-bottom: 6px; }
+.acc-vi-l::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 2px; vertical-align: middle; }
+.acc-vi-l-precio::before { background: var(--text-primary); }
+.acc-vi-l-max::before { background: var(--positivo); }
+.acc-vi-l-vi::before { background: var(--series-3); }
+.acc-vi-l-rango::before { background: color-mix(in srgb, var(--series-3) 35%, transparent); border: 1px solid var(--series-3); }
+
+/* Alertas: severidad baja (oportunidad) y alertas sin ticker (sector) */
+.acc-alerta-baja { border-left-color: var(--positivo); }
+.acc-alerta-titulo-fijo { cursor: default; display: inline-block; }
+
+.acc-alerta-titulo-fijo:hover { text-decoration: none; }
+
+.acc-screener-form input::placeholder { text-transform: none; }
+
+/* ---- Fase 4 (2026-09-22): correlacion/riesgo (mapa de calor) + Simulador ---- */
+.acc-riesgo-cols {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.acc-riesgo-izq { flex: 1 1 0; min-width: 0; }
+.acc-riesgo-der { flex: 0 0 300px; min-width: 0; }
+@media (max-width: 1100px) {
+  .acc-riesgo-cols { flex-direction: column; align-items: stretch; }
+  .acc-riesgo-der { flex: 0 0 auto; }
+}
+
+.acc-heatmap {
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.acc-heatmap th {
+  padding: 4px 6px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.acc-heatmap td.acc-heatmap-celda {
+  width: 34px;
+  height: 26px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--bg);
+  color: var(--text-primary);
+}
+.acc-heatmap td.acc-heatmap-alta {
+  box-shadow: inset 0 0 0 2px var(--accent);
+  font-weight: 700;
+}
+
+.acc-riesgo-chips {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.acc-riesgo-chips .acc-chip { white-space: normal; }
+
+.acc-simulador-form input[type="text"] { width: 140px; text-transform: uppercase; }
+.acc-simulador-form input[type="text"]::placeholder { text-transform: none; }
+.acc-simulador-form input[type="number"] { width: 110px; }
+.acc-simulador-form select { min-width: 160px; }
+
+/* ---- ¿CEDEAR en pesos o en dolares? (2026-09-24) ---- */
+.cedear-moneda-form input[type="text"] { width: 120px; text-transform: uppercase; }
+.cedear-moneda-form input[type="text"]::placeholder { text-transform: none; }
+.cm-cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px 16px; margin: 8px 0; }
+.cm-cifras div { display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; }
+.cm-cifras strong { font-size: 17px; font-variant-numeric: tabular-nums; }
+.cm-recs { list-style: none; padding: 0; margin: 6px 0; display: flex; flex-direction: column; gap: 4px; font-size: 14.5px; }
+.cm-pesos { color: var(--series-2); }
+.cm-dolares { color: var(--series-3); }
+.cm-ticker { color: var(--text-primary); font-weight: 600; text-decoration: none; }
+.cm-ticker:hover { text-decoration: underline; }
+.cm-cantidad { font-size: 12.5px; }
+.cm-ny { border-top: 1px solid var(--border); padding-top: 6px; }
+.cb-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 8px 0; }
+@media (max-width: 900px) { .cb-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .cb-kpis { grid-template-columns: 1fr; } }
+.cb-badge-barato { color: var(--series-2); border-color: color-mix(in srgb, var(--series-2) 55%, transparent); background: color-mix(in srgb, var(--series-2) 12%, transparent); }
+.cb-badge-caro { color: var(--series-4); border-color: color-mix(in srgb, var(--series-4) 55%, transparent); background: color-mix(in srgb, var(--series-4) 12%, transparent); }
+.cb-sin-badge { display: inline-block; font-size: 12.5px; white-space: normal; max-width: 220px; vertical-align: middle; }
+
+/* ---- Frontera eficiente de RV (Epica 19, Fase 5, 2026-09-23) ---- */
+.frontera-controles { margin-bottom: 8px; }
+.frontera-chart { width: 100%; height: auto; display: block; margin: 8px 0 4px; }
+.frontera-grid { stroke: var(--border); stroke-width: 0.6; }
+.frontera-eje-label { fill: var(--text-secondary); font-size: 10px; }
+.frontera-eje-titulo { fill: var(--text-secondary); font-size: 11px; font-weight: 600; }
+.frontera-nube { fill: var(--text-secondary); opacity: 0.3; }
+.frontera-linea { fill: none; stroke: var(--series-3); stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
+.frontera-pt-actual { fill: var(--series-1); stroke: var(--bg); stroke-width: 1.5; }
+.frontera-pt-mv { fill: var(--series-2); stroke: var(--bg); stroke-width: 1.5; }
+.frontera-pt-ms { fill: var(--series-4); stroke: var(--bg); stroke-width: 1.5; }
+.frontera-pt-texto { fill: var(--text-primary); font-size: 11px; font-weight: 600; paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
+.frontera-leyenda { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13.5px; color: var(--text-secondary); margin-bottom: 12px; }
+.frontera-leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+.frontera-aviso { border-left: 3px solid var(--accent); padding: 6px 10px; margin: 6px 0; font-size: 13.5px; color: var(--text-secondary); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.frontera-aviso-error { border-left-color: var(--negativo); }
+.frontera-badge { display: inline-block; font-size: 12.5px; font-weight: 700; padding: 1px 8px; border-radius: 9px; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); background: color-mix(in srgb, var(--accent) 12%, transparent); white-space: nowrap; }
+.frontera-cifra { font-variant-numeric: tabular-nums; }
+
+
+/* ---- Panel de Rendimiento (rediseño 2026-10-27) ----------------------
+   Indicadores + curva del acumulado + barras de cada mes, alineadas.
+   Marcas finas (linea 2px, barras <= 24px con el extremo redondeado),
+   grilla en hairline solida, texto siempre en tokens de texto. Las barras
+   usan un par diverging validado para daltonismo (ver app.js). */
+.rend-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: 10px;
+  margin: 12px 0 14px;
+}
+.rend-kpi {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+}
+.rend-kpi.provisorio {
+  border-style: dashed;
+  border-color: var(--accent);
+}
+.rend-kpi-label {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+}
+.rend-kpi-valor {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 2px 0 1px;
+  color: var(--text-primary);
+}
+.rend-kpi-sub {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+}
+.rend-graficos {
+  position: relative;
+}
+.rend-grafico-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin: 2px 0 2px;
+}
+.rend-grafico-titulo {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.rend-leyenda {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.rend-key-linea {
+  width: 16px;
+  height: 0;
+  border-top: 2px solid var(--accent);
+}
+.rend-key-linea.provisoria {
+  border-top-style: dashed;
+}
+.rend-key-barra {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.rend-key-barra.positiva { background: #0ea5a4; }
+.rend-key-barra.negativa { background: #e5603d; }
+.rend-key-barra.provisoria { background: #0ea5a4; opacity: 0.4; }
+.rendimiento-svg, .rendimiento-svg-mensual {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+.rend-franja-anio {
+  fill: var(--text-primary);
+  opacity: 0.03;
+}
+.rend-anio-label {
+  fill: var(--text-secondary);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.rend-anio-nombre {
+  fill: var(--text-primary);
+  font-weight: 600;
+}
+.rend-grilla {
+  stroke: var(--border);
+  stroke-width: 1;
+  opacity: 0.6;
+}
+.rend-cero {
+  stroke: var(--text-secondary);
+  stroke-width: 1;
+  opacity: 0.6;
+}
+.rend-eje-label {
+  fill: var(--text-secondary);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+.rend-eje-anio {
+  fill: var(--text-primary);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.rend-area {
+  fill: var(--accent);
+  opacity: 0.1;
+}
+.rend-linea {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.rend-linea-provisoria {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 4 4;
+  stroke-linecap: round;
+}
+.rend-punto-final {
+  fill: var(--accent);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+.rend-punto-provisorio {
+  fill: var(--surface);
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.rend-punto-hover {
+  fill: var(--accent);
+  stroke: var(--surface);
+  stroke-width: 2;
+  pointer-events: none;
+}
+.rend-valor-label {
+  fill: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.rend-valor-sub {
+  fill: var(--text-secondary);
+  font-size: 11.5px;
+}
+.rend-valor-chico {
+  fill: var(--text-primary);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.rend-barra {
+  transition: opacity 0.12s;
+}
+.rend-barra.provisoria {
+  opacity: 0.4;
+}
+.rend-barra.atenuada {
+  opacity: 0.35;
+}
+.rend-barra.provisoria.atenuada {
+  opacity: 0.2;
+}
+.rend-crosshair {
+  stroke: var(--text-secondary);
+  stroke-width: 1;
+  pointer-events: none;
+}
+.rend-tooltip {
+  position: absolute;
+  top: 34px;
+  z-index: 5;
+  min-width: 230px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  font-size: 13.5px;
+}
+.rend-tip-titulo {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  margin-bottom: 6px;
+}
+.rend-tip-fila {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 3px 0;
+}
+.rend-tip-key {
+  flex: 0 0 12px;
+  height: 2px;
+  align-self: center;
+  border-radius: 1px;
+}
+.rend-tip-fila strong {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.rend-tip-label {
+  color: var(--text-secondary);
+}
+.rend-detalle {
+  margin-top: 10px;
+  font-size: 13.5px;
+}
+.rend-detalle summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+.rend-tabla-detalle td, .rend-tabla-detalle th {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.rend-tabla-detalle td:first-child, .rend-tabla-detalle th:first-child {
+  text-align: left;
+}
+.rend-tabla-detalle tr.provisoria td {
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+/* Celular (2026-10-29): "Ver todo" debajo de la tabla del flujo de pagos,
+   que en pantallas angostas muestra solo las primeras filas. */
+.eventos-ver-todo {
+  align-self: center;
+  margin-top: 8px;
+}
+
+/* Modo demo (2026-10-29): la API es de solo lectura (403 en todo lo que no
+   sea GET), asi que se ocultan los controles que escriben y los campos
+   editables quedan deshabilitados -- ningun boton visible termina en un
+   403. aplicarModoDemo() (app.js) pone la clase en <body> y el aviso
+   "Demo: solo lectura" arriba de cada panel con carga. */
+.aviso-demo {
+  margin: 0 0 10px;
+  padding: 6px 10px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 55%, var(--border));
+  border-radius: 6px;
+  color: var(--accent);
+  font-size: 12.5px;
+}
+
+body.modo-demo form.tesis-form,
+body.modo-demo .acc-screener-form,
+body.modo-demo #watchlist-error,
+body.modo-demo #fundamentales-actualizar-btn,
+body.modo-demo #fundamentales-estado,
+body.modo-demo .acc-simulador-form,
+body.modo-demo #simulador-rv-estado,
+body.modo-demo label:has(#cedear-moneda-umbral),
+body.modo-demo #cedear-moneda-umbral-btn,
+body.modo-demo label:has(#cb-umbral),
+body.modo-demo #cb-umbral-btn,
+body.modo-demo .rebalanceo-guardar[data-ticker],
+body.modo-demo .tenencias-editor,
+body.modo-demo [data-accion="guardar-seccion"],
+body.modo-demo [data-accion="nuevo"],
+body.modo-demo [data-accion="editar"],
+body.modo-demo [data-accion="archivar"],
+body.modo-demo [data-accion="restaurar"],
+body.modo-demo [data-accion="borrar"],
+body.modo-demo [data-accion="borrar-lectura"],
+body.modo-demo [data-accion="refrescar-uno"],
+body.modo-demo [data-form="lectura"],
+body.modo-demo [data-quitar],
+body.modo-demo #simulador-rv-agregar-watchlist-btn,
+body.modo-demo #simulador-rv-guardar-btn,
+body.modo-demo .macro-item-editar,
+body.modo-demo .macro-anotacion-form,
+body.modo-demo .maquina-fase-form,
+body.modo-demo .tesis-umbral-form,
+body.modo-demo .umbral-btn-eliminar,
+body.modo-demo .tesis-btn-cerrar,
+body.modo-demo .tesis-btn-editar,
+body.modo-demo .tesis-btn-eliminar {
+  display: none !important;
+}
+
+body.modo-demo [data-campo] {
+  pointer-events: none;
+  opacity: 0.75;
+}
+
+/* Detalle mensual del rendimiento (2026-10-30): en celular la tabla (6
+   columnas) es mas ancha que el panel; se desplaza de costado en vez de
+   cortarse, como el resto de las tablas. */
+#rendimiento-tabla {
+  overflow-x: auto;
+}

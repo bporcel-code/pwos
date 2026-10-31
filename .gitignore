@@ -1,0 +1,13 @@
+# Datos: ninguna base ni export se versiona.
+*.db
+database/demo/
+descargas/
+backups/
+logs/
+.env
+
+# Entorno local
+venv/
+.venv/
+__pycache__/
+.pytest_cache/

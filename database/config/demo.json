@@ -1,0 +1,109 @@
+{
+  "_descripcion": "Configuracion del inversor demo (ejemplo publico). Ver configuracion.py. generar_demo.py completa demo.fecha_generacion.",
+  "titulo": "Inversor demo",
+  "nombre": "Inversor demo",
+  "brokers": {
+    "Broker A": {
+      "abreviatura": "Broker A",
+      "color": 1,
+      "formato_renta": "generico",
+      "patrones_caucion": []
+    },
+    "Broker B": {
+      "abreviatura": "Broker B",
+      "color": 2,
+      "formato_renta": "generico",
+      "patrones_caucion": []
+    }
+  },
+  "contenedores_excluidos_otros_pasivos": [],
+  "renta": {
+    "patrones_amortizacion_texto": [
+      "Amortizaci%n {ticker}%"
+    ],
+    "amortizaciones_confirmadas_manual": {},
+    "dividendos_en_especie_confirmados": []
+  },
+  "movimientos": {
+    "patrones_flujo_externo": [
+      "Deposito de fondos%",
+      "Extraccion de fondos%"
+    ],
+    "patrones_fondeo_broker_personal": [
+      "%BROKER A%",
+      "%BROKER B%"
+    ],
+    "patrones_cuenta_propia": [
+      "%(cuenta propia)%"
+    ],
+    "patrones_aporte_externo": [
+      "Aporte externo%"
+    ],
+    "textos_no_alquiler": [
+      "sueldo",
+      "broker a",
+      "broker b",
+      "plazo fijo"
+    ]
+  },
+  "precios_data912": {
+    "moneda_precio": {
+      "AL30": "ARS",
+      "GD30": "ARS",
+      "GD35": "ARS",
+      "PN36O": "ARS"
+    },
+    "ticker_override": {}
+  },
+  "bonos": {
+    "moneda_pago": {
+      "AL30": "USD",
+      "GD30": "USD",
+      "GD35": "USD",
+      "PN36O": "USD",
+      "S31G6": "ARS",
+      "T30A7": "ARS"
+    },
+    "categoria_override": {},
+    "costo_origen_canje": {},
+    "emisor_soberano": {
+      "AL30": "NACION",
+      "GD30": "NACION",
+      "GD35": "NACION",
+      "S31G6": "NACION",
+      "T30A7": "NACION"
+    },
+    "tipo_instrumento_soberano": {
+      "AL30": "soberano_estandar",
+      "GD30": "soberano_estandar",
+      "GD35": "soberano_estandar",
+      "S31G6": "soberano_estandar",
+      "T30A7": "soberano_estandar"
+    },
+    "on_emisor_yfinance": {
+      "PN36O": null
+    }
+  },
+  "cierres_mensuales": {
+    "patron_xlsx": "*cierres_demo*.xlsx"
+  },
+  "demo": {
+    "fecha_generacion": null
+  },
+  "precios_rava": {
+    "moneda_precio": {
+      "AL30": "ARS",
+      "GD30": "ARS",
+      "GD35": "ARS",
+      "PN36O": "ARS"
+    },
+    "sin_cobertura": []
+  },
+  "precios_yfinance": {
+    "sin_cobertura": []
+  },
+  "real_estate": {
+    "tasa_descuento": 0.06,
+    "tasa_descuento_fuente": "6% -- referencia de rentabilidad bruta de alquiler residencial en USD (aprox.: bruta, sin gastos/vacancia/impuestos; promedio de mercado, no el rendimiento puntual de esta propiedad)."
+  }
+}

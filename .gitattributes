@@ -1,0 +1,12 @@
+# Scripts que corren dentro de un contenedor Linux (python:3.14-slim)
+# necesitan LF si o si -- CRLF rompe el shebang/la ejecucion dentro del
+# contenedor. Sin esto, el autocrlf de git en Windows los convertiria a
+# CRLF en un checkout nuevo (encontrado al armar database/docker-entrypoint.sh,
+# 2026-08-14).
+*.sh text eol=lf
+Dockerfile text eol=lf
+
+# Normalizacion general: todo lo que git detecte como texto se guarda con LF
+# en el repo y se convierte segun la plataforma al hacer checkout. Evita que
+# los archivos aparezcan modificados solo por LF/CRLF (2026-10-27).
+* text=auto

@@ -1,0 +1,52 @@
+# Demo de PWOS con un solo comando: arma la imagen, genera la base demo
+# (baja los datos de mercado reales) y la sirve en modo demo, de solo lectura.
+#
+#   docker compose up --build        ->  http://localhost:8001
+#
+# La primera vez tarda (ver "Cómo correr la demo" en el README). La base y la
+# caché de descargas quedan en el volumen `demo-datos`: los arranques
+# siguientes la reusan. Para regenerarla: docker compose down -v
+#
+# Variables opcionales (en el entorno o en un archivo .env):
+#   DEMO_CORTE    fecha de corte AAAA-MM-DD (default: último día hábil cerrado)
+#   DEMO_PUERTO   puerto del dashboard (default: 8001)
+#   FRED_API_KEY  clave gratuita de FRED; sin ella, las series de EE.UU. de FRED quedan vacías
+
+name: pwos-publico
+
+services:
+  generar:
+    build: ./database
+    image: pwos-publico-demo
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        if [ -s demo/demo.db ]; then echo "La demo ya esta generada (para regenerarla: docker compose down -v)";
+        else python generar_demo.py $${DEMO_CORTE:+--corte $$DEMO_CORTE}; fi
+    environment:
+      DEMO_CORTE: ${DEMO_CORTE:-}
+      FRED_API_KEY: ${FRED_API_KEY:-}
+    volumes:
+      - demo-datos:/app/demo
+
+  demo:
+    image: pwos-publico-demo
+    depends_on:
+      generar:
+        condition: service_completed_successfully
+    entrypoint: ["sh", "-c"]
+    # La API lee /app/pwos.db y la foto del cierre de CEDEARs junto a ella;
+    # demo.env trae PWOS_MODO=demo y la fecha de corte.
+    command:
+      - >-
+        ln -sf /app/demo/demo.db /app/pwos.db &&
+        ln -sf /app/demo/cierre_cedears.json /app/cierre_cedears.json &&
+        set -a && . /app/demo/demo.env && set +a &&
+        exec ./docker-entrypoint.sh uvicorn api:app --host 0.0.0.0 --port 8000
+    ports:
+      - "${DEMO_PUERTO:-8001}:8000"
+    volumes:
+      - demo-datos:/app/demo:ro
+
+volumes:
+  demo-datos:

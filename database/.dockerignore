@@ -1,0 +1,12 @@
+# Datos, no codigo -- pwos.db y descargas/ se montan como volumen en
+# `docker run` (ver Dockerfile), nunca se copian a la imagen. Los exports
+# crudos historicos (*.xls/*.xlsx/*.csv sueltos en database/) tampoco los
+# usa api.py en ningun endpoint -- eran entrada de reprocesos historicos
+# ya cerrados (Tarea 1.6/6.x), no hace falta que viajen a la imagen.
+*.db
+*.xls
+*.xlsx
+*.csv
+descargas/
+__pycache__/
+referencias/

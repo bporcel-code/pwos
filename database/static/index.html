@@ -1,0 +1,1301 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PWOS — Patrimonio</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="titulo-caja">
+        <h1 class="titulo-principal">Personal Wealth Operating System</h1>
+        <p class="autor" id="autor"></p>
+        <p class="subtitulo" id="subtitulo">Cargando...</p>
+        <p class="subtitulo" id="cotizaciones-estado"></p>
+      </div>
+      <div class="metricas" id="metricas-header">
+        <div class="metrica-grupo metrica-principal">
+          <p class="metrica-label">Patrimonio total</p>
+          <p class="metrica-valor" id="patrimonio-total">—</p>
+          <p class="metrica-detalle" id="patrimonio-total-detalle"></p>
+        </div>
+        <div class="metrica-grupo">
+          <p class="metrica-label">Ganancia / pérdida</p>
+          <p class="metrica-valor" id="ganancia-total">—</p>
+          <p class="metrica-detalle" id="ganancia-total-detalle"></p>
+        </div>
+        <div class="metrica-grupo">
+          <p class="metrica-label">Riesgo de cartera</p>
+          <p class="metrica-valor" id="riesgo-total">—</p>
+          <p class="metrica-detalle" id="riesgo-total-detalle"></p>
+        </div>
+        <div class="metrica-grupo">
+          <p class="metrica-label">Sensibilidad a tasas</p>
+          <p class="metrica-valor" id="bpv-total">—</p>
+          <p class="metrica-detalle" id="bpv-total-detalle"></p>
+        </div>
+        <div class="metrica-grupo">
+          <p class="metrica-label">Renta fija</p>
+          <p class="metrica-valor" id="renta-fija-total">—</p>
+          <p class="metrica-detalle" id="renta-fija-total-detalle"></p>
+        </div>
+      </div>
+    </header>
+
+    <nav class="menu-superior" id="menu-superior">
+      <button type="button" data-vista="dashboard" class="activo">Dashboard</button>
+      <button type="button" data-vista="indicadores-macro">Indicadores Macro</button>
+      <button type="button" data-vista="analisis-bonos">Bonos</button>
+      <button type="button" data-vista="analisis-acciones">Acciones</button>
+      <button type="button" data-vista="real-estate">Real Estate</button>
+    </nav>
+
+    <div id="vista-dashboard">
+    <main class="cascada" id="cascada">
+      <section class="panel" id="panel-composicion">
+        <div class="panel-header">
+          <h2>Composición de cartera</h2>
+          <div class="dim-selector" id="dim-selector">
+            <button type="button" data-dim="tipo_activo" class="activo">Tipo de activo</button>
+            <button type="button" data-dim="broker">Broker</button>
+            <button type="button" data-dim="riesgo">Riesgo</button>
+          </div>
+        </div>
+        <nav class="breadcrumb" id="breadcrumb"></nav>
+        <div class="donut-area">
+          <svg class="donut-svg" id="donut-svg" viewBox="0 0 240 240"></svg>
+          <div class="donut-center" id="donut-center">
+            <p class="donut-center-label" id="donut-center-label">Cartera total</p>
+            <p class="donut-center-valor" id="donut-center-valor">—</p>
+          </div>
+        </div>
+        <div class="donut-legend" id="donut-legend"></div>
+        <p class="eventos-nota" id="donut-nota"></p>
+      </section>
+
+      <section class="panel" id="panel-ganancia">
+        <div class="panel-header">
+          <h2>Ganancia / pérdida por activo</h2>
+          <div class="dim-selector" id="ganancia-vista-toggle">
+            <button type="button" data-vista="no_realizada" class="activo">No realizada</button>
+            <button type="button" data-vista="realizada">Realizada</button>
+          </div>
+        </div>
+        <div class="dim-selector" id="ganancia-filtro-l1">
+          <button type="button" data-filtro="todos" class="activo">Todos</button>
+          <button type="button" data-filtro="renta_fija">Renta fija</button>
+          <button type="button" data-filtro="renta_variable">Renta variable</button>
+        </div>
+        <div class="dim-selector dim-selector-sub hidden" id="ganancia-filtro-l2"></div>
+        <div class="ganancia-subtotal" id="ganancia-subtotal"></div>
+        <div class="renta-cobrada hidden" id="renta-cobrada"></div>
+        <div class="dividendos-cobrados hidden" id="dividendos-cobrados"></div>
+        <div class="eventos-wrap">
+          <table class="eventos-tabla">
+            <thead>
+              <tr id="ganancia-head"></tr>
+            </thead>
+            <tbody id="ganancia-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-flujo">
+        <div class="panel-header">
+          <h2>Flujo de pagos mensual</h2>
+          <div class="flujo-controles">
+            <select class="riesgo-select" id="riesgo-filtro">
+              <option value="todos">Riesgo: todos</option>
+              <option value="Conservador">Conservador</option>
+              <option value="Moderado">Moderado</option>
+              <option value="Arriesgado">Arriesgado</option>
+              <option value="No verificable">No verificable</option>
+            </select>
+            <button type="button" class="flujo-toggle" id="flujo-toggle">Ver todo</button>
+          </div>
+        </div>
+        <div class="flujo-chart" id="flujo-chart"></div>
+        <div class="flujo-leyenda" id="flujo-leyenda">
+          <span id="tabla-filtro-info"></span>
+        </div>
+        <div class="eventos-wrap">
+          <table class="eventos-tabla">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Concepto</th>
+                <th>Entra en</th>
+                <th style="text-align:right">Monto</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="eventos-body"></tbody>
+          </table>
+        </div>
+        <button type="button" class="flujo-toggle eventos-ver-todo hidden" id="eventos-ver-todo">Ver todo</button>
+        <p class="eventos-nota" id="flujo-nota">Todo es estimado hasta que entra a la cuenta: los pesos se pasan a USD al MEP de hoy. "A confirmar" = ya debería haber entrado; la próxima ronda incremental lo confirma y muestra la diferencia con lo real.</p>
+      </section>
+    </main>
+
+    <section class="panel panel-rendimiento-standalone" id="panel-rendimiento">
+      <div class="panel-header">
+        <div>
+          <h2 id="rendimiento-titulo">Rendimiento acumulado</h2>
+          <p class="rendimiento-subtitulo" id="rendimiento-subtitulo">Cargando...</p>
+        </div>
+      </div>
+      <div class="rend-kpis" id="rendimiento-kpis"></div>
+      <div class="rend-graficos" id="rendimiento-graficos">
+        <div class="rend-grafico-cabecera">
+          <span class="rend-grafico-titulo">Acumulado</span>
+          <span class="rend-leyenda"><span class="rend-key-linea"></span>cierre mensual</span>
+          <span class="rend-leyenda"><span class="rend-key-linea provisoria"></span>mes en curso, provisorio (PWOS)</span>
+        </div>
+        <svg class="rendimiento-svg" id="rendimiento-svg" role="img"></svg>
+        <div class="rend-grafico-cabecera">
+          <span class="rend-grafico-titulo">Cada mes</span>
+          <span class="rend-leyenda"><span class="rend-key-barra positiva"></span>mes positivo</span>
+          <span class="rend-leyenda"><span class="rend-key-barra negativa"></span>mes negativo</span>
+          <span class="rend-leyenda"><span class="rend-key-barra provisoria"></span>provisorio</span>
+        </div>
+        <svg class="rendimiento-svg-mensual" id="rendimiento-svg-mensual" role="img"></svg>
+        <div class="rend-tooltip" id="rendimiento-tooltip" hidden></div>
+      </div>
+      <details class="rend-detalle">
+        <summary>Ver mes a mes</summary>
+        <div id="rendimiento-tabla"></div>
+      </details>
+      <p class="eventos-nota" id="rendimiento-nota"></p>
+    </section>
+
+    <section class="panel panel-efectivo-standalone" id="panel-efectivo">
+      <div class="panel-header">
+        <div>
+          <h2>Efectivo por contenedor</h2>
+          <p class="rendimiento-subtitulo">Saldos en moneda nativa — para cruzar contra lo que muestra cada app de broker.</p>
+        </div>
+      </div>
+      <div class="eventos-wrap">
+        <table class="eventos-tabla efectivo-tabla">
+          <thead>
+            <tr>
+              <th>Contenedor</th>
+              <th style="text-align:right">ARS disponible</th>
+              <th style="text-align:right">USD disponible</th>
+              <th style="text-align:right">ARS caución</th>
+              <th style="text-align:right">USD caución</th>
+              <th style="text-align:right">ARS plazo fijo</th>
+              <th style="text-align:right">USD plazo fijo</th>
+              <th style="text-align:right">USD cable</th>
+            </tr>
+          </thead>
+          <tbody id="efectivo-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel panel-tesis-standalone" id="panel-tesis-cartera">
+      <div class="panel-header">
+        <div>
+          <h2>Metas y tesis de la cartera</h2>
+          <p class="rendimiento-subtitulo" id="tesis-cartera-subtitulo">Cargando...</p>
+        </div>
+      </div>
+
+      <form class="tesis-form" id="tesis-cartera-form">
+        <input type="hidden" id="tesis-cartera-form-id" value="" />
+        <div class="tesis-form-fila">
+          <label>Fecha
+            <input type="date" id="tesis-cartera-form-fecha" required />
+          </label>
+          <label>Convicción
+            <select id="tesis-cartera-form-conviccion">
+              <option value="">—</option>
+              <option value="alta">Alta</option>
+              <option value="media">Media</option>
+              <option value="baja">Baja</option>
+            </select>
+          </label>
+        </div>
+        <label class="tesis-form-fila-full">Tesis / meta
+          <textarea id="tesis-cartera-form-tesis" rows="3" required placeholder="¿Qué buscás con la cartera completa? Ej. meta de patrimonio, cambio de estrategia, criterio de asignación."></textarea>
+        </label>
+        <label class="tesis-form-fila-full">Riesgos
+          <textarea id="tesis-cartera-form-riesgos" rows="2" placeholder="¿Qué la invalidaría?"></textarea>
+        </label>
+        <div class="tesis-form-acciones">
+          <button type="submit" id="tesis-cartera-form-guardar-btn">Guardar</button>
+          <button type="button" id="tesis-cartera-form-cancelar-btn" class="simulador-btn-sec" hidden>Cancelar edición</button>
+        </div>
+        <p class="simulador-nota" id="tesis-cartera-form-error" hidden></p>
+      </form>
+
+      <div class="mercado-bonos-chips" id="tesis-cartera-chips"></div>
+
+      <div class="tesis-lista" id="tesis-cartera-lista"></div>
+      <p class="eventos-nota">Bitácora cronológica de la cartera COMPLETA (más reciente primero) — para no perder de vista metas y objetivos generales. Al cerrar/revisar una entrada se le agrega una reflexión final, no crea una nueva. Para tesis de un instrumento puntual, usá la solapa de Bonos o Acciones.</p>
+    </section>
+    </div>
+
+    <div id="vista-indicadores-macro" class="hidden">
+    <section class="panel panel-maquina-standalone" id="panel-maquina">
+      <div class="panel-header">
+        <div>
+          <h2>Máquina económica</h2>
+          <p class="rendimiento-subtitulo">Cuatro semáforos armados con tus umbrales y objetivos: cada uno toma el peor color de sus indicadores (rojo = umbral cruzado, amarillo = entre objetivo y umbral, verde = del lado bueno; sin umbral cargado = gris, no cuenta). Ordena lo que ya definiste, no recomienda nada.</p>
+        </div>
+      </div>
+      <div class="maquina-grid" id="maquina-grid"><p class="eventos-vacio">Cargando...</p></div>
+      <p class="maquina-tesis" id="maquina-tesis"></p>
+    </section>
+
+    <section class="panel panel-macro-standalone" id="panel-macro">
+      <div class="panel-header">
+        <div>
+          <h2>Contexto macro</h2>
+          <p class="rendimiento-subtitulo">Cada indicador con su última observación y fecha, variación a 3 y 12 meses y percentil contra sus últimos 10 años (0 = mínimo, 100 = máximo). Con ✎ se le escribe un umbral de nivel (avisa con ⚠️ si se cruza), un umbral de velocidad sobre el Δ3m (avisa con ⚡), un objetivo o una nota.</p>
+        </div>
+      </div>
+      <div class="macro-grid" id="macro-grid"></div>
+    </section>
+    </div>
+
+    <div id="vista-analisis-bonos" class="hidden">
+
+    <section class="panel panel-breakeven-infl-standalone" id="panel-breakeven-inflacion">
+      <div class="panel-header">
+        <div>
+          <h2>Breakeven de inflación</h2>
+          <p class="rendimiento-subtitulo" id="breakeven-inflacion-subtitulo">Cargando...</p>
+        </div>
+        <button type="button" class="panel-toggle" data-panel="panel-breakeven-inflacion" aria-label="Contraer/expandir panel">▾</button>
+      </div>
+      <div class="eventos-wrap">
+        <table class="eventos-tabla" id="breakeven-inflacion-tabla">
+          <thead>
+            <tr>
+              <th data-sort="ticker_cer">Bono CER</th>
+              <th data-sort="duration_cer">Dur.</th>
+              <th data-sort="tir_cer_pct">TIR&nbsp;CER</th>
+              <th data-sort="ticker_tasa_fija">vs.&nbsp;tasa fija</th>
+              <th data-sort="categoria_tasa_fija">Categoría</th>
+              <th data-sort="duration_tasa_fija">Dur.</th>
+              <th data-sort="tir_tasa_fija_pct">TIR</th>
+              <th data-sort="brecha_duration">Brecha&nbsp;dur.</th>
+              <th data-sort="breakeven_inflacion_pct">Breakeven&nbsp;infl.</th>
+            </tr>
+          </thead>
+          <tbody id="breakeven-inflacion-body"></tbody>
+        </table>
+      </div>
+      <p class="eventos-nota">Cada bono CER emparejado con el bono a tasa fija (LECAP/BONCAP) de duration más cercana en todo el universo de Rava. Breakeven = TIR tasa fija − TIR CER: la inflación que el mercado está pricing in a ese plazo. "Brecha dur." = diferencia de duration entre el par — cuanto más grande, menos confiable la lectura (no hay un bono de tasa fija realmente comparable a ese plazo). Clic en un encabezado para ordenar.</p>
+    </section>
+
+    <section class="panel panel-devaluacion-standalone" id="panel-devaluacion-implicita">
+      <div class="panel-header">
+        <div>
+          <h2>Devaluación implícita</h2>
+          <p class="rendimiento-subtitulo" id="devaluacion-implicita-subtitulo">Cargando...</p>
+        </div>
+        <button type="button" class="panel-toggle" data-panel="panel-devaluacion-implicita" aria-label="Contraer/expandir panel">▾</button>
+      </div>
+      <div class="eventos-wrap">
+        <table class="eventos-tabla" id="devaluacion-implicita-tabla">
+          <thead>
+            <tr>
+              <th data-sort="ticker_ars">Bono tasa fija (ARS)</th>
+              <th data-sort="duration_ars">Dur.</th>
+              <th data-sort="tir_ars_pct">TIR&nbsp;ARS</th>
+              <th data-sort="ticker_usd">vs.&nbsp;dólar</th>
+              <th data-sort="categoria_usd">Categoría</th>
+              <th data-sort="duration_usd">Dur.</th>
+              <th data-sort="tir_usd_pct">TIR&nbsp;USD</th>
+              <th data-sort="brecha_duration">Brecha&nbsp;dur.</th>
+              <th data-sort="devaluacion_implicita_pct">Deval.&nbsp;implícita</th>
+            </tr>
+          </thead>
+          <tbody id="devaluacion-implicita-body"></tbody>
+        </table>
+      </div>
+      <p class="eventos-nota">Cada bono a tasa fija en pesos (LECAP/BONCAP) emparejado con el bono dollar-linked o hard-dollar (Bonares/Globales/dollar-linked) de duration más cercana. Devaluación = (1+TIR ARS)/(1+TIR USD) − 1 (paridad de tasas, no resta simple — cruza 2 monedas). "Brecha dur." igual criterio que en Breakeven de inflación. Clic en un encabezado para ordenar.</p>
+    </section>
+
+    <section class="panel panel-ratio-bonos-standalone" id="panel-ratio-bonos">
+      <div class="panel-header">
+        <div>
+          <h2>Comparador de ratio</h2>
+          <p class="rendimiento-subtitulo" id="ratio-bonos-subtitulo">Cargando...</p>
+          <p class="ratio-bonos-promedio" id="ratio-bonos-promedio"></p>
+        </div>
+      </div>
+      <div class="mercado-bonos-filtros">
+        <select id="ratio-bonos-ticker-a" class="ratio-bonos-select-ticker"></select>
+        <span class="ratio-bonos-vs">/</span>
+        <select id="ratio-bonos-ticker-b" class="ratio-bonos-select-ticker"></select>
+      </div>
+      <div class="ratio-bonos-chart-caja">
+        <div class="macro-chart-header">
+          <span class="macro-chart-rango" id="ratio-bonos-rango"></span>
+          <button type="button" class="macro-chart-rango-btn" id="ratio-bonos-rango-btn">Ver todo el historial</button>
+        </div>
+        <svg class="macro-chart-svg ratio-bonos-svg" id="ratio-bonos-svg" viewBox="0 0 800 140" preserveAspectRatio="none"></svg>
+        <p class="eventos-vacio" id="ratio-bonos-vacio" hidden></p>
+      </div>
+      <div class="eventos-wrap">
+        <table class="eventos-tabla" id="ratio-bonos-precios-tabla">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th id="ratio-bonos-precios-th-a" style="text-align:right">Precio A</th>
+              <th id="ratio-bonos-precios-th-b" style="text-align:right">Precio B</th>
+              <th style="text-align:right">Ratio</th>
+            </tr>
+          </thead>
+          <tbody id="ratio-bonos-precios-body"></tbody>
+        </table>
+      </div>
+      <p class="eventos-nota">Últimos 15 días con cotización de ambos — el precio es el que devuelve Rava tal cual (sin convertir a USD): pesos para la especie base, USD directo para las variantes C/D.</p>
+      <p class="eventos-nota">Ratio = precio de A / precio de B, día por día — solo en las fechas donde ambos tickers tienen cotización ese día (sin interpolar). El "ratio" que siguen los brokers (ej. AL30/GD30, ley local vs. ley NY). Fuente: <code>precios</code> (cotización real de Rava). Bonares, Globales y CER: universo COMPLETO de Rava (69 especies, incluidas las variantes en pesos/MEP/cable). El resto de renta fija sigue acotado a los tickers que alguna vez operaste.</p>
+    </section>
+
+    <div class="bonos-cat-row">
+      <section class="panel panel-bonos-cat-standalone" id="panel-bonos-categorias">
+        <div class="panel-header">
+          <div>
+            <h2>Tenencias de bonos por categoría</h2>
+            <p class="rendimiento-subtitulo" id="bonos-cat-subtitulo">Cargando...</p>
+          </div>
+        </div>
+        <div class="rank-bars" id="bonos-cat-bars"></div>
+      </section>
+
+      <section class="panel panel-bonos-cat-standalone" id="panel-bonos-sensibilidad">
+        <div class="panel-header">
+          <div>
+            <h2>Sensibilidad a tasas por categoría</h2>
+            <p class="rendimiento-subtitulo" id="bonos-sens-subtitulo">Cargando...</p>
+          </div>
+        </div>
+        <div class="rank-bars" id="bonos-sens-bars"></div>
+        <p class="eventos-nota">Barras = BPV (DV01) sumado por categoría — qué parte de la cartera concentra más riesgo de tasa, no solo más valor. "Carry" bajo cada barra = running yield de esa categoría (carry $ / valorización $). Mismas categorías y colores que "Tenencias por categoría".</p>
+      </section>
+    </div>
+
+    <section class="panel panel-simulador-standalone" id="panel-simulador-bono">
+      <div class="panel-header">
+        <div>
+          <h2>Analizador / simulador de bonos</h2>
+          <p class="rendimiento-subtitulo">TIR, duration, paridad y flujo de cualquier especie — más simulación por precio o TIR objetivo. Fuente: Rava (cacheado).</p>
+        </div>
+      </div>
+
+      <div class="simulador-buscador">
+        <input type="text" id="simulador-ticker-input" list="simulador-tickers-datalist"
+               placeholder="Ticker (ej. GD30, AL30, TX31)" autocomplete="off" spellcheck="false" />
+        <datalist id="simulador-tickers-datalist"></datalist>
+        <button type="button" id="simulador-analizar-btn">Analizar</button>
+      </div>
+
+      <div id="simulador-resultado" hidden>
+        <div class="simulador-titulo-bono" id="simulador-titulo-bono"></div>
+
+        <h3 class="simulador-subseccion">Hoy (mercado)</h3>
+        <div class="simulador-metricas" id="simulador-metricas-mercado"></div>
+
+        <div id="simulador-posicion-wrap" hidden>
+          <h3 class="simulador-subseccion">Tu posición</h3>
+          <div class="simulador-metricas" id="simulador-metricas-posicion"></div>
+        </div>
+
+        <h3 class="simulador-subseccion">Simular</h3>
+        <div class="simulador-inputs">
+          <label>Precio (VN 100, <span id="simulador-moneda-label">—</span>)
+            <input type="number" step="0.01" id="simulador-input-precio" placeholder="—" />
+          </label>
+          <label>TIR objetivo (%)
+            <input type="number" step="0.1" id="simulador-input-tir" placeholder="—" />
+          </label>
+          <button type="button" id="simulador-simular-btn">Simular</button>
+          <button type="button" id="simulador-limpiar-btn" class="simulador-btn-sec">Limpiar</button>
+        </div>
+        <div class="simulador-metricas" id="simulador-metricas-sim" hidden></div>
+        <p class="simulador-nota" id="simulador-nota-sim" hidden></p>
+
+        <h3 class="simulador-subseccion">Flujo de fondos futuro (por VN 100)</h3>
+        <div class="flujo-chart" id="simulador-cronograma-chart"></div>
+        <p class="eventos-nota" id="simulador-cronograma-nota"></p>
+      </div>
+      <p class="simulador-nota" id="simulador-error" hidden></p>
+    </section>
+
+    <section class="panel panel-comparador-standalone" id="panel-comparador-bonos">
+      <div class="panel-header">
+        <div>
+          <h2>Comparador de bonos</h2>
+          <p class="rendimiento-subtitulo">Precio o TIR objetivo por bono, resultados lado a lado — mismo motor que el Analizador de arriba.</p>
+        </div>
+      </div>
+      <div id="comparador-filas"></div>
+      <div class="simulador-buscador">
+        <button type="button" id="comparador-agregar-btn" class="simulador-btn-sec">+ Agregar bono</button>
+        <button type="button" id="comparador-comparar-btn">Comparar</button>
+      </div>
+      <p class="simulador-nota" id="comparador-error" hidden></p>
+      <div class="eventos-wrap">
+        <table class="eventos-tabla" id="comparador-tabla" hidden>
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Tipo</th>
+              <th>Escenario</th>
+              <th>Precio&nbsp;(VN100)</th>
+              <th>TIR&nbsp;%</th>
+              <th>TNA&nbsp;%</th>
+              <th>Duration</th>
+              <th>Mod.&nbsp;dur</th>
+              <th>Convex.</th>
+              <th>Current&nbsp;yield</th>
+              <th>Paridad&nbsp;%</th>
+              <th>Años&nbsp;vto.</th>
+            </tr>
+          </thead>
+          <tbody id="comparador-body"></tbody>
+        </table>
+      </div>
+      <p class="eventos-nota">Cada fila se analiza de forma independiente contra <code>/api/simular-bono</code> (mismo endpoint que el Analizador). Sin precio ni TIR objetivo, "Escenario" muestra la foto de mercado de hoy; con alguno de los dos cargado, muestra esa simulación puntual para ese bono.</p>
+    </section>
+
+    <section class="panel panel-mercado-bonos-standalone" id="panel-mercado-bonos">
+      <div class="panel-header">
+        <div>
+          <h2>Mercado de bonos</h2>
+          <p class="rendimiento-subtitulo" id="mercado-bonos-subtitulo">Cargando...</p>
+        </div>
+        <button type="button" class="panel-toggle" data-panel="panel-mercado-bonos" aria-label="Contraer/expandir panel">▾</button>
+      </div>
+      <div class="mercado-bonos-chips" id="mercado-bonos-chips"></div>
+      <div class="mercado-curva-caja" id="mercado-curva-caja">
+        <svg class="mercado-curva-svg" id="mercado-curva-svg" viewBox="0 0 620 210" xmlns="http://www.w3.org/2000/svg"></svg>
+        <p class="mercado-curva-nota" id="mercado-curva-nota"></p>
+      </div>
+      <div class="mercado-bonos-filtros">
+        <input type="text" id="mercado-bonos-buscar" placeholder="Buscar ticker" autocomplete="off" />
+        <select id="mercado-bonos-ley">
+          <option value="">Toda legislación</option>
+          <option value="ARG">Ley ARG</option>
+          <option value="NY">Ley NY</option>
+        </select>
+        <label class="mercado-bonos-check">
+          <input type="checkbox" id="mercado-bonos-variantes" />
+          Especies C/D (cable/MEP)
+        </label>
+        <label class="mercado-bonos-check">
+          <input type="checkbox" id="mercado-bonos-curva" checked />
+          Curva TIR / duration
+        </label>
+      </div>
+      <div class="eventos-wrap mercado-bonos-wrap">
+        <table class="eventos-tabla" id="mercado-bonos-tabla">
+          <thead>
+            <tr>
+              <th data-sort="ticker">Ticker</th>
+              <th data-sort="emisor">Emisor</th>
+              <th data-sort="categoria">Categoría</th>
+              <th data-sort="legislacion">Ley</th>
+              <th data-sort="precio_limpio_vn100">Precio</th>
+              <th data-sort="paridad_pct">Paridad&nbsp;%</th>
+              <th data-sort="tir_pct">TIR&nbsp;%</th>
+              <th data-sort="duration">Duration</th>
+              <th data-sort="dm">Mod.&nbsp;dur</th>
+              <th data-sort="convexity">Convex.</th>
+              <th data-sort="vencimiento">Vto.</th>
+            </tr>
+          </thead>
+          <tbody id="mercado-bonos-body"></tbody>
+        </table>
+      </div>
+      <p class="eventos-nota">Clic en una fila para analizarla abajo. TIR/duration/convexidad: los que publica Rava (mismo dato que docta). Precio y paridad: precio limpio implícito de la TIR de Rava (el feed masivo trae el precio sin normalizar). Emisor y categoría: de la API de un broker + patrón de ticker.</p>
+    </section>
+
+    <section class="panel panel-rotacion-standalone" id="panel-rotacion">
+      <div class="panel-header">
+        <div>
+          <h2>Bonos en tenencia</h2>
+          <p class="rendimiento-subtitulo">PPC vs. precio de hoy, invertido vs. valorización actual, y TIR de entrada vs. TIR de hoy (compresión) por bono de renta fija vigente.</p>
+        </div>
+        <button type="button" class="panel-toggle" data-panel="panel-rotacion" aria-label="Contraer/expandir panel">▾</button>
+      </div>
+      <div class="mercado-bonos-chips" id="rotacion-chips"></div>
+      <div class="mercado-bonos-filtros">
+        <select id="rotacion-moneda">
+          <option value="">Toda moneda</option>
+          <option value="ARS">ARS</option>
+          <option value="USD">USD</option>
+        </select>
+      </div>
+      <div class="eventos-wrap">
+        <table class="eventos-tabla" id="rotacion-tabla">
+          <thead>
+            <tr>
+              <th data-sort="ticker">Ticker</th>
+              <th data-sort="emisor">Emisor</th>
+              <th data-sort="categoria_label">Categoría</th>
+              <th data-sort="duration">Duration</th>
+              <th data-sort="cantidad">Cantidad</th>
+              <th data-sort="moneda">Mon.</th>
+              <th data-sort="precio_entrada_vn100">PPC</th>
+              <th data-sort="precio_hoy_vn100">Precio</th>
+              <th data-sort="paridad_pct">Paridad&nbsp;%</th>
+              <th data-sort="invertido_usd">Invertido&nbsp;(USD)</th>
+              <th data-sort="valorizacion_usd">Valoriz.&nbsp;(USD)</th>
+              <th data-sort="tir_entrada_pct">TIR&nbsp;entr.</th>
+              <th data-sort="tir_hoy_pct">TIR&nbsp;hoy</th>
+              <th data-sort="compresion_pp">Compr.</th>
+            </tr>
+          </thead>
+          <tbody id="rotacion-body"></tbody>
+        </table>
+      </div>
+      <p class="eventos-nota">PPC y Precio: por VN 100, en la moneda de pago del bono. Duration: Macaulay, en años, de Rava (misma fuente que "Mercado de bonos"). Invertido: cada compra al MEP/CCL de su fecha (mismo criterio que Ganancia/pérdida). Compresión = TIR de entrada − TIR de hoy; en naranja si supera 3 pp. Bonos CER (marca "R"): TIR real, por encima del CER — precio y cronograma llevados a unidades reales con el CER del BCRA (10 días hábiles de rezago). Bonos dollar-linked: en USD; si entraron por canje, la entrada representativa es lo invertido en el bono original. Categoría: mismo clasificador que "Mercado de bonos". Carry % y BPV (DV01) de cada posición: ver la tabla "Breakeven de tasa" (debajo) — se sacaron de acá para no repetir columnas entre las 2 tablas (2026-09-11). Clic en un encabezado para ordenar.</p>
+    </section>
+
+    <section class="panel panel-breakeven-standalone" id="panel-breakeven">
+      <div class="panel-header">
+        <div>
+          <h2>Breakeven de tasa</h2>
+          <p class="rendimiento-subtitulo" id="breakeven-subtitulo">Cargando...</p>
+        </div>
+        <button type="button" class="panel-toggle" data-panel="panel-breakeven" aria-label="Contraer/expandir panel">▾</button>
+      </div>
+      <div class="eventos-wrap">
+        <table class="eventos-tabla" id="breakeven-tabla">
+          <thead>
+            <tr>
+              <th data-sort="ticker">Ticker</th>
+              <th data-sort="categoria_label">Categoría</th>
+              <th data-sort="bpv_usd">BPV&nbsp;(USD)</th>
+              <th data-sort="carry_usd">Carry&nbsp;(USD/año)</th>
+              <th data-sort="breakeven_pb">Breakeven&nbsp;(pb)</th>
+            </tr>
+          </thead>
+          <tbody id="breakeven-body"></tbody>
+        </table>
+      </div>
+      <p class="eventos-nota">Breakeven = Carry anual en $ de la posición / BPV en $ de la posición — cuántos puntos básicos puede subir la TIR de ESE bono antes de que la pérdida de precio le gane al cupón cobrado en el año. Ordenado de menor a mayor breakeven (lo más ajustado primero) por defecto. Bonos capitalizados cerca del vencimiento (BPV casi nulo) muestran breakevens enormes — es correcto, no un error: casi no pierden precio por suba de tasas.</p>
+    </section>
+
+    <section class="panel panel-calendario-standalone" id="panel-calendario">
+      <div class="panel-header">
+        <div>
+          <h2>Calendario de flujo mensual</h2>
+          <p class="rendimiento-subtitulo" id="calendario-subtitulo">Cargando...</p>
+        </div>
+        <button type="button" class="panel-toggle" data-panel="panel-calendario" aria-label="Contraer/expandir panel">▾</button>
+      </div>
+      <div class="eventos-wrap">
+        <table class="eventos-tabla">
+          <thead>
+            <tr>
+              <th>Mes</th>
+              <th>Interés</th>
+              <th>Amortización</th>
+              <th>Dividendos</th>
+              <th>Alquileres</th>
+              <th>Otros</th>
+              <th>Total</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="calendario-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel panel-tesis-standalone" id="panel-tesis-bonos">
+      <div class="panel-header">
+        <div>
+          <h2>Tesis de inversión</h2>
+          <p class="rendimiento-subtitulo" id="tesis-bonos-subtitulo">Cargando...</p>
+        </div>
+      </div>
+
+      <form class="tesis-form" id="tesis-bonos-form">
+        <input type="hidden" id="tesis-bonos-form-id" value="" />
+        <div class="tesis-form-tipo">
+          <label><input type="radio" name="tesis-bonos-tipo" value="macro" checked /> Macro (cartera de bonos completa)</label>
+          <label><input type="radio" name="tesis-bonos-tipo" value="micro" /> Micro (bono puntual)</label>
+        </div>
+        <div class="tesis-form-fila" id="tesis-bonos-form-ticker-wrap" hidden>
+          <label>Ticker
+            <input type="text" id="tesis-bonos-form-ticker" list="tesis-bonos-tickers-datalist" placeholder="Ej. GD30" autocomplete="off" spellcheck="false" />
+            <datalist id="tesis-bonos-tickers-datalist"></datalist>
+          </label>
+        </div>
+        <div class="tesis-form-fila">
+          <label>Fecha
+            <input type="date" id="tesis-bonos-form-fecha" required />
+          </label>
+          <label>Convicción
+            <select id="tesis-bonos-form-conviccion">
+              <option value="">—</option>
+              <option value="alta">Alta</option>
+              <option value="media">Media</option>
+              <option value="baja">Baja</option>
+            </select>
+          </label>
+        </div>
+        <label class="tesis-form-fila-full">Tesis
+          <textarea id="tesis-bonos-form-tesis" rows="3" required placeholder="¿Cuál es la idea? ¿Por qué ahora?"></textarea>
+        </label>
+        <label class="tesis-form-fila-full">Riesgos
+          <textarea id="tesis-bonos-form-riesgos" rows="2" placeholder="¿Qué la invalidaría?"></textarea>
+        </label>
+        <div class="tesis-form-acciones">
+          <button type="submit" id="tesis-bonos-form-guardar-btn">Guardar tesis</button>
+          <button type="button" id="tesis-bonos-form-cancelar-btn" class="simulador-btn-sec" hidden>Cancelar edición</button>
+        </div>
+        <p class="simulador-nota" id="tesis-bonos-form-error" hidden></p>
+      </form>
+
+      <div class="mercado-bonos-chips" id="tesis-bonos-chips"></div>
+      <div class="mercado-bonos-filtros">
+        <select id="tesis-bonos-filtro-instrumento">
+          <option value="">Todos los instrumentos</option>
+        </select>
+      </div>
+
+      <div class="tesis-lista" id="tesis-bonos-lista"></div>
+      <p class="eventos-nota">Bitácora cronológica (más reciente primero). Al cerrar/revisar una tesis se le agrega una reflexión final — no crea una entrada nueva, actualiza la misma. Podés tener varias tesis a lo largo del tiempo sobre el mismo bono. "Micro" acepta cualquier ticker, tengas posición o no — sirve también para bonos que estás evaluando comprar.</p>
+    </section>
+    </div>
+
+    <div id="vista-analisis-acciones" class="hidden">
+
+    <div class="acc-encabezado">
+      <h2 class="acc-titulo">Análisis — Acciones</h2>
+      <p class="acc-fuente" id="acc-fuente">Precios en USD · Datos: cargando...</p>
+    </div>
+
+    <div class="acc-kpis">
+      <div class="acc-kpi">
+        <p class="acc-kpi-label">Renta variable</p>
+        <p class="acc-kpi-valor" id="acc-kpi-rv-valor">—</p>
+        <p class="acc-kpi-sub" id="acc-kpi-rv-sub"></p>
+      </div>
+      <div class="acc-kpi">
+        <p class="acc-kpi-label">Peso sobre patrimonio bruto</p>
+        <p class="acc-kpi-valor" id="acc-kpi-peso-valor">—</p>
+        <p class="acc-kpi-sub" id="acc-kpi-peso-sub"></p>
+      </div>
+      <div class="acc-kpi">
+        <p class="acc-kpi-label">Concentración top 5</p>
+        <p class="acc-kpi-valor" id="acc-kpi-top5-valor">—</p>
+        <p class="acc-kpi-sub">de la renta variable</p>
+      </div>
+      <div class="acc-kpi">
+        <p class="acc-kpi-label">Posiciones con tesis</p>
+        <p class="acc-kpi-valor" id="acc-kpi-tesis-valor">—</p>
+        <p class="acc-kpi-sub">Sin indicadores cargados no hay semáforo</p>
+      </div>
+      <div class="acc-kpi">
+        <p class="acc-kpi-label">Alertas activas</p>
+        <p class="acc-kpi-valor" id="acc-kpi-alertas-valor">—</p>
+        <p class="acc-kpi-sub" id="acc-kpi-alertas-sub">revisión, indicadores y topes</p>
+      </div>
+    </div>
+
+    <div class="acc-principal">
+      <section class="panel acc-panel acc-col-izq" id="panel-tenencias-rv">
+        <div class="panel-header">
+          <div>
+            <h2>Tenencias de renta variable</h2>
+            <p class="rendimiento-subtitulo" id="tenencias-rv-subtitulo">Cargando...</p>
+          </div>
+          <button type="button" class="panel-toggle" data-panel="panel-tenencias-rv" aria-label="Contraer/expandir panel">▾</button>
+        </div>
+        <div class="eventos-wrap acc-tenencias-wrap">
+          <table class="eventos-tabla">
+            <thead>
+              <tr>
+                <th>Ticker</th>
+                <th>Cubeta</th>
+                <th style="text-align:right">Cantidad</th>
+                <th style="text-align:right">Valor USD</th>
+                <th>% de la RV</th>
+                <th style="text-align:right">Peso obj.</th>
+                <th>Tesis</th>
+                <th>Estado de valor</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tenencias-body"></tbody>
+          </table>
+        </div>
+        <div class="acc-tenencias-pie">
+          <span id="tenencias-pie-texto"></span>
+          <span id="tenencias-pie-monto"></span>
+        </div>
+        <p class="eventos-nota">La marca vertical de la barra es el tope de posición (borrador, editable en parametros_rv) y el ámbar indica que lo supera. El tope del patrimonio se marca con "tope patr." — % sobre el patrimonio bruto (efectivo + inversiones + inmuebles, sin restar deuda).</p>
+      </section>
+
+      <div class="acc-col-der">
+        <section class="panel acc-panel" id="panel-cubetas-rv">
+          <div class="panel-header">
+            <div>
+              <h2>Composición por cubeta vs. objetivo</h2>
+              <p class="rendimiento-subtitulo">% de la renta variable; banda sombreada = objetivo</p>
+            </div>
+            <button type="button" class="panel-toggle" data-panel="panel-cubetas-rv" aria-label="Contraer/expandir panel">▾</button>
+          </div>
+          <div id="cubetas-rv-cuerpo"></div>
+          <p class="eventos-nota" id="cubetas-rv-nota"></p>
+        </section>
+
+        <section class="panel acc-panel" id="panel-concentracion-rv">
+          <div class="panel-header">
+            <div>
+              <h2>Concentración</h2>
+              <p class="rendimiento-subtitulo">Mayores posiciones y sectores contra su tope</p>
+            </div>
+            <button type="button" class="panel-toggle" data-panel="panel-concentracion-rv" aria-label="Contraer/expandir panel">▾</button>
+          </div>
+          <div id="concentracion-rv-cuerpo"></div>
+          <p class="eventos-nota" id="concentracion-rv-nota"></p>
+        </section>
+
+        <section class="panel acc-panel" id="panel-alertas-rv">
+          <div class="panel-header">
+            <div>
+              <h2>Alertas y semáforos</h2>
+              <p class="rendimiento-subtitulo" id="alertas-rv-subtitulo">Cargando...</p>
+            </div>
+            <button type="button" class="panel-toggle" data-panel="panel-alertas-rv" aria-label="Contraer/expandir panel">▾</button>
+          </div>
+          <div id="alertas-rv-cuerpo"></div>
+          <p class="eventos-nota">Las alertas muestran el dato y la regla de tu marco; no son órdenes. Clic en una alerta abre la ficha de la posición.</p>
+        </section>
+      </div>
+    </div>
+
+    <section class="panel acc-panel hidden" id="ficha-rv">
+      <div class="acc-ficha-cab" id="ficha-cab"></div>
+      <div class="acc-ficha-cols">
+        <div class="acc-ficha-col">
+          <div class="acc-ficha-bloque" id="ficha-tesis"></div>
+          <div class="acc-ficha-bloque" id="ficha-indicadores"></div>
+          <div class="acc-ficha-bloque">
+            <h3 class="acc-ficha-titulo">Reglas por semáforo</h3>
+            <ul class="acc-ficha-reglas">
+              <li><span class="acc-dot acc-dot-verde"></span><strong>Verde</strong> — mantener, o sumar si el precio acompaña.</li>
+              <li><span class="acc-dot acc-dot-amarillo"></span><strong>Amarillo</strong> — frenar aportes y revisar en 30 días. Dos lecturas seguidas en amarillo generan una alerta.</li>
+              <li><span class="acc-dot acc-dot-rojo"></span><strong>Rojo</strong> — reducir de forma escalonada, salvo que se documente por escrito por qué la tesis sigue viva (entrada de esta posición en la bitácora de tesis, con fecha igual o posterior a la lectura roja).</li>
+            </ul>
+          </div>
+        </div>
+        <div class="acc-ficha-col">
+          <div class="acc-ficha-bloque" id="ficha-alertas-pos"></div>
+          <div class="acc-ficha-bloque" id="ficha-valuacion-auto"></div>
+          <div class="acc-ficha-bloque" id="ficha-valuacion"></div>
+          <div class="acc-ficha-bloque" id="ficha-alertas"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel acc-panel" id="panel-screener-rv">
+      <div class="panel-header">
+        <div>
+          <h2>Screener Graham-Plus</h2>
+          <p class="rendimiento-subtitulo" id="screener-rv-subtitulo">Cargando...</p>
+        </div>
+        <button type="button" class="panel-toggle" data-panel="panel-screener-rv" aria-label="Contraer/expandir panel">▾</button>
+      </div>
+      <div class="acc-screener-cols">
+        <div class="acc-screener-izq">
+          <div class="eventos-wrap acc-tenencias-wrap">
+            <table class="eventos-tabla">
+              <thead>
+                <tr>
+                  <th>Ticker</th>
+                  <th>Cubeta</th>
+                  <th title="Descartes duros cuantitativos">C0 Descartes</th>
+                  <th title="Calidad: ROIC, márgenes, conversión a caja">C1 Calidad</th>
+                  <th title="Precio: umbrales de Graham-Plus de la cubeta">C2 Precio</th>
+                  <th title="Encaje: topes de posición y sector, prima del CEDEAR, correlación">C3 Encaje</th>
+                  <th>Estado de valor</th>
+                  <th style="text-align:right">Margen</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="screener-body"></tbody>
+            </table>
+          </div>
+          <p class="eventos-nota">
+            <span class="acc-gate acc-gate-pasa">✓</span> pasa ·
+            <span class="acc-gate acc-gate-no_pasa">✕</span> no pasa ·
+            <span class="acc-gate acc-gate-sin_verificar">?</span> sin verificar (nunca "pasa" por falta de dato) ·
+            <span class="acc-gate acc-gate-no_aplica">–</span> no aplica.
+            Pasá el mouse por una compuerta para ver qué criterios fallan o no se pudieron verificar. C0 no evalúa el "círculo de competencia": es un juicio tuyo.
+            El Margen es el descuento del precio contra el valor intrínseco conservador.
+          </p>
+        </div>
+        <div class="acc-screener-der">
+          <h3 class="acc-ficha-titulo">Top 5 por margen de seguridad</h3>
+          <div id="screener-top5"></div>
+
+          <h3 class="acc-ficha-titulo acc-screener-sep">Candidatas (watchlist)</h3>
+          <div class="acc-editor acc-screener-form">
+            <label>Ticker de Yahoo <input type="text" id="watchlist-ticker" placeholder="Ej. BKNG o YPFD.BA" autocomplete="off" spellcheck="false"></label>
+            <label>Cubeta sugerida
+              <select id="watchlist-cubeta">
+                <option value="">Sin cubeta</option>
+                <option value="valor_puro">Valor puro</option>
+                <option value="calidad">Calidad</option>
+                <option value="mayor_riesgo">Mayor riesgo</option>
+              </select>
+            </label>
+            <button type="button" class="rebalanceo-guardar" id="watchlist-agregar-btn">Agregar candidata</button>
+          </div>
+          <div class="acc-ficha-error" id="watchlist-error"></div>
+
+          <h3 class="acc-ficha-titulo acc-screener-sep">Fundamentales</h3>
+          <button type="button" class="rebalanceo-guardar" id="fundamentales-actualizar-btn">Actualizar fundamentales</button>
+          <p class="eventos-nota" id="fundamentales-estado">Descarga de Yahoo (yfinance) a demanda, unos 2 minutos para toda la cartera. Cada dato lleva su fecha y fuente en la ficha.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel panel-rebalanceo-standalone" id="panel-rebalanceo">
+      <div class="panel-header">
+        <div>
+          <h2>Rebalanceo de Renta Variable</h2>
+          <p class="rendimiento-subtitulo" id="rebalanceo-subtitulo">Cargando...</p>
+        </div>
+      </div>
+      <div class="eventos-wrap">
+        <table class="eventos-tabla">
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th style="text-align:right">Valor USD</th>
+              <th style="text-align:right">Peso actual</th>
+              <th style="text-align:right">Objetivo %</th>
+              <th style="text-align:right">Delta</th>
+              <th>Acción</th>
+              <th style="text-align:right">Monto sugerido</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="rebalanceo-body"></tbody>
+        </table>
+      </div>
+      <p class="eventos-nota">* el motor de decisión es el delta contra la tesis que cargues acá — sin objetivo definido no se sugiere nada. Click en el ticker para cargar/editar el detalle de la tesis (motivo, riesgo, horizonte, precio objetivo, criterio de venta).</p>
+    </section>
+
+    <section class="panel acc-panel" id="panel-riesgo-rv">
+      <div class="panel-header">
+        <div>
+          <h2>Correlación y contribución al riesgo</h2>
+          <p class="rendimiento-subtitulo" id="riesgo-rv-subtitulo">Cargando...</p>
+        </div>
+        <button type="button" class="panel-toggle" data-panel="panel-riesgo-rv" aria-label="Contraer/expandir panel">▾</button>
+      </div>
+      <div class="acc-riesgo-cols">
+        <div class="acc-riesgo-izq">
+          <div id="riesgo-heatmap"></div>
+          <p class="eventos-nota">Mapa de calor de las principales posiciones por peso. Diagonal = 1,00. Ámbar = correlación ≥ umbral de redundancia.</p>
+          <div class="acc-conc-titulo acc-screener-sep">Pares redundantes (correlación ≥ umbral)</div>
+          <div id="riesgo-pares"></div>
+        </div>
+        <div class="acc-riesgo-der">
+          <div class="acc-conc-titulo">Contribución al riesgo total</div>
+          <div id="riesgo-contribucion"></div>
+          <div class="acc-riesgo-chips" id="riesgo-chips"></div>
+        </div>
+      </div>
+      <p class="eventos-nota">* solo informativo — no decide nada, el rebalanceo se maneja por tu objetivo, no por esto. Herramienta de diagnóstico, no un oráculo.</p>
+    </section>
+
+    <section class="panel acc-panel" id="panel-frontera-rv">
+      <div class="panel-header">
+        <div>
+          <h2>Frontera eficiente</h2>
+          <p class="rendimiento-subtitulo" id="frontera-rv-subtitulo">Cargando...</p>
+        </div>
+        <button type="button" class="panel-toggle" data-panel="panel-frontera-rv" aria-label="Contraer/expandir panel">▾</button>
+      </div>
+      <div class="acc-editor frontera-controles">
+        <label>Tope por activo (%) <input type="number" id="frontera-tope" min="5" max="100" step="1" value="25"></label>
+        <label>Ventana histórica (semanas) <input type="number" id="frontera-ventana" min="52" max="520" step="4" value="104"></label>
+        <label>Marcar desvíos mayores a (pp) <input type="number" id="frontera-desvio" min="0.5" max="50" step="0.5" value="5"></label>
+      </div>
+      <div id="frontera-avisos"></div>
+      <div id="frontera-cuerpo">
+        <svg id="frontera-chart" class="frontera-chart" viewBox="0 0 800 380" role="img" aria-label="Frontera eficiente: riesgo contra retorno esperado"></svg>
+        <div class="frontera-leyenda" id="frontera-leyenda"></div>
+        <div class="eventos-wrap">
+          <table class="eventos-tabla">
+            <thead>
+              <tr>
+                <th>Ticker</th>
+                <th style="text-align:right">Peso actual</th>
+                <th style="text-align:right">Mín. varianza <span class="acc-tenue">(guía principal)</span></th>
+                <th style="text-align:right">Desvío</th>
+                <th style="text-align:right">Máx. Sharpe <span class="acc-tenue">(referencia)</span></th>
+                <th style="text-align:right">Desvío</th>
+              </tr>
+            </thead>
+            <tbody id="frontera-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <p class="eventos-nota" id="frontera-nota"></p>
+    </section>
+
+    <section class="panel acc-panel" id="panel-simulador-rv">
+      <div class="panel-header">
+        <div>
+          <h2>Simulador de compra</h2>
+          <p class="rendimiento-subtitulo">Pesos, correlación y riesgo antes/después de una compra hipotética — nunca dice comprar ni vender.</p>
+        </div>
+        <button type="button" class="panel-toggle" data-panel="panel-simulador-rv" aria-label="Contraer/expandir panel">▾</button>
+      </div>
+      <div class="acc-editor acc-simulador-form">
+        <label>Ticker de Yahoo <input type="text" id="simulador-rv-ticker" placeholder="Ej. BKNG o YPFD.BA" autocomplete="off" spellcheck="false"></label>
+        <label>Monto a comprar (USD) <input type="number" id="simulador-rv-monto" min="1" step="1" placeholder="1000"></label>
+        <label>Fuente de fondos
+          <select id="simulador-rv-fuente">
+            <option value="aporte_nuevo">Aporte nuevo</option>
+          </select>
+        </label>
+        <label>Cubeta (opcional)
+          <select id="simulador-rv-cubeta">
+            <option value="">Sin especificar</option>
+            <option value="valor_puro">Valor puro</option>
+            <option value="calidad">Calidad</option>
+            <option value="mayor_riesgo">Mayor riesgo</option>
+          </select>
+        </label>
+        <button type="button" class="rebalanceo-guardar" id="simulador-rv-simular-btn">Simular</button>
+      </div>
+      <p class="acc-ficha-estado" id="simulador-rv-estado"></p>
+      <div id="simulador-rv-resultado"></div>
+    </section>
+
+    <section class="panel acc-panel" id="panel-cedear-moneda">
+      <div class="panel-header">
+        <div>
+          <h2>¿CEDEAR en pesos o en dólares?</h2>
+          <p class="rendimiento-subtitulo">Compara la punta vendedora en pesos contra la de la especie D (dólar MEP) del mismo CEDEAR. El ratio se cancela: no hace falta.</p>
+        </div>
+        <button type="button" class="panel-toggle" data-panel="panel-cedear-moneda" aria-label="Contraer/expandir panel">▾</button>
+      </div>
+      <div class="acc-editor cedear-moneda-form">
+        <label>Ticker BYMA (en pesos) <input type="text" id="cedear-moneda-ticker" list="cedear-moneda-opciones" placeholder="Ej. NFLX" autocomplete="off" spellcheck="false"></label>
+        <datalist id="cedear-moneda-opciones"></datalist>
+        <button type="button" class="rebalanceo-guardar" id="cedear-moneda-evaluar-btn">Evaluar</button>
+        <label>Umbral “solo dólares” (%) <input type="number" id="cedear-moneda-umbral" min="0" max="100" step="0.1"></label>
+        <button type="button" class="rebalanceo-guardar" id="cedear-moneda-umbral-btn">Guardar umbral</button>
+      </div>
+      <p class="acc-ficha-estado" id="cedear-moneda-estado"></p>
+      <div id="cedear-moneda-resultado"></div>
+      <p class="frontera-aviso">Confirmá las puntas en tu broker antes de operar — el feed puede tener demora.</p>
+      <div class="eventos-wrap">
+        <table class="eventos-tabla">
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th style="text-align:right">Punta ARS</th>
+              <th style="text-align:right">Punta USD</th>
+              <th style="text-align:right">Dólar implícito</th>
+              <th style="text-align:right">Spread</th>
+              <th>Tengo pesos y dólares</th>
+              <th>Tengo solo dólares</th>
+            </tr>
+          </thead>
+          <tbody id="cedear-moneda-body"></tbody>
+        </table>
+      </div>
+      <p class="eventos-nota" id="cedear-moneda-nota"></p>
+    </section>
+
+    <section class="panel acc-panel" id="panel-cedear-caro-barato">
+      <div class="panel-header">
+        <div>
+          <h2>¿Caro o barato vs. el resto?</h2>
+          <p class="rendimiento-subtitulo">CCL implícito de cada CEDEAR contra la mediana del mercado: la prima común de todos se cancela y queda lo relativo.</p>
+        </div>
+        <button type="button" class="panel-toggle" data-panel="panel-cedear-caro-barato" aria-label="Contraer/expandir panel">▾</button>
+      </div>
+      <div class="acc-kpis cb-kpis" id="cb-kpis"></div>
+      <div id="cb-avisos"></div>
+      <div class="acc-editor">
+        <label class="cb-toggle"><span>Mostrar</span>
+          <select id="cb-universo">
+            <option value="cartera">Cartera + watchlist</option>
+            <option value="todos">Todos los CEDEARs con ratio</option>
+          </select>
+        </label>
+        <label>Marcar desvíos mayores a (%) <input type="number" id="cb-umbral" min="0" max="100" step="0.1"></label>
+        <button type="button" class="rebalanceo-guardar" id="cb-umbral-btn">Guardar umbral</button>
+      </div>
+      <p class="acc-ficha-estado" id="cb-estado"></p>
+      <div class="eventos-wrap">
+        <table class="eventos-tabla">
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th style="text-align:right">CCL implícito</th>
+              <th style="text-align:right">Desvío vs mediana</th>
+              <th style="text-align:right">Desvío vs KO</th>
+              <th style="text-align:right">Valor teórico ARS</th>
+              <th style="text-align:right">Precio ARS (punta)</th>
+              <th>Precio NY</th>
+            </tr>
+          </thead>
+          <tbody id="cb-body"></tbody>
+        </table>
+      </div>
+      <p class="eventos-nota" id="cb-nota"></p>
+    </section>
+
+    <section class="panel panel-tesis-standalone" id="panel-tesis-acciones">
+      <div class="panel-header">
+        <div>
+          <h2>Tesis de inversión</h2>
+          <p class="rendimiento-subtitulo" id="tesis-acciones-subtitulo">Cargando...</p>
+        </div>
+      </div>
+
+      <form class="tesis-form" id="tesis-acciones-form">
+        <input type="hidden" id="tesis-acciones-form-id" value="" />
+        <div class="tesis-form-tipo">
+          <label><input type="radio" name="tesis-acciones-tipo" value="macro" checked /> Macro (cartera de Renta Variable completa)</label>
+          <label><input type="radio" name="tesis-acciones-tipo" value="micro" /> Micro (acción/CEDEAR puntual)</label>
+        </div>
+        <div class="tesis-form-fila" id="tesis-acciones-form-ticker-wrap" hidden>
+          <label>Ticker
+            <input type="text" id="tesis-acciones-form-ticker" list="tesis-acciones-tickers-datalist" placeholder="Ej. BKNG" autocomplete="off" spellcheck="false" />
+            <datalist id="tesis-acciones-tickers-datalist"></datalist>
+          </label>
+        </div>
+        <div class="tesis-form-fila">
+          <label>Fecha
+            <input type="date" id="tesis-acciones-form-fecha" required />
+          </label>
+          <label>Convicción
+            <select id="tesis-acciones-form-conviccion">
+              <option value="">—</option>
+              <option value="alta">Alta</option>
+              <option value="media">Media</option>
+              <option value="baja">Baja</option>
+            </select>
+          </label>
+        </div>
+        <label class="tesis-form-fila-full">Tesis
+          <textarea id="tesis-acciones-form-tesis" rows="3" required placeholder="¿Cuál es la idea? ¿Por qué ahora?"></textarea>
+        </label>
+        <label class="tesis-form-fila-full">Riesgos
+          <textarea id="tesis-acciones-form-riesgos" rows="2" placeholder="¿Qué la invalidaría?"></textarea>
+        </label>
+        <div class="tesis-form-acciones">
+          <button type="submit" id="tesis-acciones-form-guardar-btn">Guardar tesis</button>
+          <button type="button" id="tesis-acciones-form-cancelar-btn" class="simulador-btn-sec" hidden>Cancelar edición</button>
+        </div>
+        <p class="simulador-nota" id="tesis-acciones-form-error" hidden></p>
+      </form>
+
+      <div class="mercado-bonos-chips" id="tesis-acciones-chips"></div>
+      <div class="mercado-bonos-filtros">
+        <select id="tesis-acciones-filtro-instrumento">
+          <option value="">Todos los instrumentos</option>
+        </select>
+      </div>
+
+      <div class="tesis-lista" id="tesis-acciones-lista"></div>
+      <p class="eventos-nota">Bitácora cronológica (más reciente primero). Al cerrar/revisar una tesis se le agrega una reflexión final — no crea una entrada nueva, actualiza la misma. Podés tener varias tesis a lo largo del tiempo sobre el mismo ticker. "Micro" acepta cualquier ticker, tengas posición o no — sirve también para acciones que estás evaluando comprar.</p>
+    </section>
+    </div>
+
+    <div id="vista-real-estate" class="hidden">
+    <section class="panel panel-efectivo-standalone" id="panel-propiedades">
+      <div class="panel-header">
+        <div>
+          <h2>Propiedades</h2>
+          <p class="rendimiento-subtitulo">Valuación vigente (historial, nunca se pisa) y deuda vinculada, si existe.</p>
+        </div>
+      </div>
+      <div class="eventos-wrap">
+        <table class="eventos-tabla" id="propiedades-tabla">
+          <thead>
+            <tr>
+              <th>Propiedad</th>
+              <th>Tipo</th>
+              <th style="text-align:right">% propio</th>
+              <th style="text-align:right">Valuación vigente</th>
+              <th>Fecha valuación</th>
+              <th style="text-align:right">Valor parte propia</th>
+              <th>Pasivo vinculado</th>
+              <th style="text-align:right">Saldo pasivo</th>
+              <th style="text-align:right" id="propiedades-th-tir">TIR anual</th>
+              <th style="text-align:right" id="propiedades-th-vpn">VPN</th>
+            </tr>
+          </thead>
+          <tbody id="propiedades-body"></tbody>
+        </table>
+      </div>
+      <p class="eventos-nota">"Valor parte propia" es la valuación bruta × % propio, SIN restar el saldo del pasivo — el patrimonio total sí lo resta (ver header). Un fondo inmobiliario (fondo_re) no entra a esta cuenta de patrimonio por esta vía: ya está contado vía su propia cuenta de efectivo. "TIR"/"VPN" (solo propiedades activo físico): flujo de inversión inicial (si está cargada) + alquileres − pagos de deuda + valor de rescate neto de hoy — ver <code>/api/flujo-inmueble/{alias}</code> para el detalle día por día. "—" cuando no hay suficientes flujos con signo distinto para calcular una tasa.</p>
+      <p class="eventos-nota" id="propiedades-tasa-fuente-nota"></p>
+    </section>
+
+    <section class="panel panel-tesis-standalone" id="panel-re-formularios">
+      <div class="panel-header">
+        <div>
+          <h2>Cargar movimientos de Real Estate</h2>
+          <p class="rendimiento-subtitulo" id="re-formularios-subtitulo">Cargando propiedades...</p>
+        </div>
+      </div>
+
+      <form class="tesis-form" id="re-alquiler-form">
+        <p class="tesis-form-fila-full" style="font-weight:600;margin:0;">Cargar alquiler cobrado</p>
+        <div class="tesis-form-fila">
+          <label>Propiedad
+            <select id="re-alquiler-propiedad" required></select>
+          </label>
+          <label>Período
+            <input type="month" id="re-alquiler-periodo" required />
+          </label>
+        </div>
+        <div class="tesis-form-fila">
+          <label>Monto (ya neto según % propio)
+            <input type="number" step="0.01" id="re-alquiler-monto" required />
+          </label>
+          <label>Moneda
+            <select id="re-alquiler-moneda">
+              <option value="ARS">ARS</option>
+              <option value="USD">USD</option>
+            </select>
+          </label>
+          <label>Fecha de cobro
+            <input type="date" id="re-alquiler-fecha" required />
+          </label>
+        </div>
+        <div class="tesis-form-acciones">
+          <button type="submit">Cargar alquiler</button>
+        </div>
+        <p class="simulador-nota" id="re-alquiler-error" hidden></p>
+      </form>
+
+      <form class="tesis-form" id="re-valuacion-form">
+        <p class="tesis-form-fila-full" style="font-weight:600;margin:0;">Cargar valuación nueva</p>
+        <div class="tesis-form-fila">
+          <label>Propiedad
+            <select id="re-valuacion-propiedad" required></select>
+          </label>
+          <label>Fecha
+            <input type="date" id="re-valuacion-fecha" required />
+          </label>
+        </div>
+        <div class="tesis-form-fila">
+          <label>Valor USD (100% del activo, no la parte propia)
+            <input type="number" step="0.01" id="re-valuacion-valor" required />
+          </label>
+          <label>Fuente (opcional)
+            <input type="text" id="re-valuacion-fuente" placeholder="Ej. tasación" />
+          </label>
+        </div>
+        <div class="tesis-form-acciones">
+          <button type="submit">Cargar valuación</button>
+        </div>
+        <p class="simulador-nota" id="re-valuacion-error" hidden></p>
+      </form>
+
+      <form class="tesis-form" id="re-pago-pasivo-form">
+        <p class="tesis-form-fila-full" style="font-weight:600;margin:0;">Cargar pago de pasivo</p>
+        <div class="tesis-form-fila">
+          <label>Pasivo
+            <select id="re-pago-pasivo-select" required></select>
+          </label>
+          <label>Fecha
+            <input type="date" id="re-pago-pasivo-fecha" required />
+          </label>
+          <label>Monto USD
+            <input type="number" step="0.01" id="re-pago-pasivo-monto" required />
+          </label>
+        </div>
+        <div class="tesis-form-acciones">
+          <button type="submit">Cargar pago</button>
+        </div>
+        <p class="simulador-nota" id="re-pago-pasivo-error" hidden></p>
+      </form>
+    </section>
+
+    <section class="panel panel-tesis-standalone" id="panel-tesis-inmuebles">
+      <div class="panel-header">
+        <div>
+          <h2>Tesis de inversión — Real Estate</h2>
+          <p class="rendimiento-subtitulo" id="tesis-inmuebles-subtitulo">Cargando...</p>
+        </div>
+      </div>
+
+      <form class="tesis-form" id="tesis-inmuebles-form">
+        <input type="hidden" id="tesis-inmuebles-form-id" value="" />
+        <div class="tesis-form-tipo">
+          <label><input type="radio" name="tesis-inmuebles-tipo" value="macro" checked /> Macro (cartera de inmuebles completa)</label>
+          <label><input type="radio" name="tesis-inmuebles-tipo" value="micro" /> Micro (propiedad puntual)</label>
+        </div>
+        <div class="tesis-form-fila" id="tesis-inmuebles-form-ticker-wrap" hidden>
+          <label>Identificador de la propiedad
+            <input type="text" id="tesis-inmuebles-form-ticker" list="tesis-inmuebles-tickers-datalist" placeholder="Ej. DEPTO-CENTRO" autocomplete="off" spellcheck="false" />
+            <datalist id="tesis-inmuebles-tickers-datalist"></datalist>
+          </label>
+          <label>Contenedor de cobro (opcional)
+            <input type="text" id="tesis-inmuebles-form-contenedor-cobro" list="tesis-inmuebles-contenedores-datalist" placeholder="Ej. Banco X" autocomplete="off" spellcheck="false" />
+            <datalist id="tesis-inmuebles-contenedores-datalist"></datalist>
+          </label>
+        </div>
+        <div class="tesis-form-fila">
+          <label>Fecha
+            <input type="date" id="tesis-inmuebles-form-fecha" required />
+          </label>
+          <label>Convicción
+            <select id="tesis-inmuebles-form-conviccion">
+              <option value="">—</option>
+              <option value="alta">Alta</option>
+              <option value="media">Media</option>
+              <option value="baja">Baja</option>
+            </select>
+          </label>
+        </div>
+        <label class="tesis-form-fila-full">Tesis
+          <textarea id="tesis-inmuebles-form-tesis" rows="3" required placeholder="¿Cuál es la idea? ¿Por qué esta propiedad / esta cartera de inmuebles?"></textarea>
+        </label>
+        <label class="tesis-form-fila-full">Riesgos
+          <textarea id="tesis-inmuebles-form-riesgos" rows="2" placeholder="¿Qué la invalidaría?"></textarea>
+        </label>
+        <div class="tesis-form-acciones">
+          <button type="submit" id="tesis-inmuebles-form-guardar-btn">Guardar tesis</button>
+          <button type="button" id="tesis-inmuebles-form-cancelar-btn" class="simulador-btn-sec" hidden>Cancelar edición</button>
+        </div>
+        <p class="simulador-nota" id="tesis-inmuebles-form-error" hidden></p>
+      </form>
+
+      <div class="mercado-bonos-chips" id="tesis-inmuebles-chips"></div>
+      <div class="mercado-bonos-filtros">
+        <select id="tesis-inmuebles-filtro-instrumento">
+          <option value="">Todas las propiedades</option>
+        </select>
+      </div>
+
+      <div class="tesis-lista" id="tesis-inmuebles-lista"></div>
+      <p class="eventos-nota">Bitácora cronológica (más reciente primero). Al cerrar/revisar una tesis se le agrega una reflexión final — no crea una entrada nueva, actualiza la misma. "Micro" acepta cualquier identificador corto de propiedad (ej. "DEPTO-CENTRO"), coincida o no con el nombre de un contenedor ya cargado. "Contenedor de cobro" es el nombre del contenedor donde entra el alquiler de esa propiedad (ej. "Banco X") — texto libre, sin validación contra `contenedores`.</p>
+    </section>
+    </div>
+
+    <footer>PWOS — Personal Wealth Operating System.</footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

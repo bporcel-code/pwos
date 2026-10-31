@@ -1,0 +1,28 @@
+name: tests
+
+# Tests publicos en cada push y pull request: modo demo, sin red y sin la base
+# real (.github/sin_red/sitecustomize.py bloquea las dos cosas).
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Dependencias
+        run: pip install -r database/requirements.txt pytest==9.1.1
+
+      - name: Tests (modo demo, sin red)
+        working-directory: database
+        env:
+          PWOS_MODO: demo
+          PWOS_CONFIG: config/demo.json
+          PYTHONPATH: ${{ github.workspace }}/.github/sin_red
+        run: python -m pytest -q -p no:cacheprovider
